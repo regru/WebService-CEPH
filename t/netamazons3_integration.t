@@ -12,10 +12,6 @@ use Reg::CEPH::NetAmazonS3;
 use POSIX ":sys_wait_h";
 use Test::More;
 
-#use File::Temp;
-#my $tmpdir = tempdir( CLEANUP => 1 );
-#my $response_file = "$tmpdir/response.tmp";
-
 our (@child_cb, @parent_cb, @messages_client, @messages_server);
 
 sub test_case {
