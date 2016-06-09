@@ -57,6 +57,19 @@ test_case "Work with plus in URL" => sub {
     $connect->send_response($resp);
 };
 
+test_case "Upload zero-size file" => sub {
+    my ($msg, $ceph) = @_;
+    $ceph->upload_single_request('mykey', '');
+    ok 1, "$msg"
+    
+} => sub {
+    my ($msg, $connect, $request) = @_;
+    die unless $request->url eq '/testbucket/mykey';
+    my $resp = HTTP::Response->new(200, 'OK');
+    $resp->header(ETag => md5_hex(''));
+    $connect->send_response($resp);
+};
+
 test_case "Upload single request with broken md5" => sub {
     my ($msg, $ceph) = @_;
     ok ! eval { $ceph->upload_single_request('mykey', 'myvalue'); 1 }, $msg;
@@ -126,6 +139,18 @@ test_case "Download single request" => sub {
     my $resp = HTTP::Response->new(200, 'OK');
     $resp->header(ETag => md5_hex($body));
     $resp->content($body);
+    $connect->send_response($resp);
+};
+
+test_case "Download zero-size file" => sub {
+    my ($msg, $ceph) = @_;
+    is $ceph->download('mykey'), "", $msg;
+} => sub {
+    my ($msg, $connect, $request) = @_;
+    die unless $request->url eq '/testbucket/mykey';
+    my $resp = HTTP::Response->new(200, 'OK');
+    $resp->header(ETag => md5_hex(''));
+    $resp->content('');
     $connect->send_response($resp);
 };
 

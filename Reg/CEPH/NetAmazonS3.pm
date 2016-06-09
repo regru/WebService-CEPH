@@ -92,9 +92,10 @@ sub download {
     
     # TODO: Net::Amazon::S3 does not validate E-Tag for multipart upload
     my $object = $self->_request_object->object( key => $key );
+    my $data;
     eval {
-        return $object->get_decoded;
-        1; # lol
+        $data = $object->get_decoded;
+        1;
     } or do {
         my $err = "$@";
         if ($err =~ /^NoSuchKey:/) {
@@ -103,7 +104,8 @@ sub download {
         else {
             die $err; # propogate exception 
         }
-    }
+    };
+    return $data;
 }
 
 sub size {
