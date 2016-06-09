@@ -44,6 +44,7 @@ test_case "Upload single request" => sub {
     $connect->send_response($resp);
 };
 
+# https://forums.aws.amazon.com/thread.jspa?threadID=55746
 test_case "Work with plus in URL" => sub {
     my ($msg, $ceph) = @_;
     $ceph->upload_single_request('my+key', 'myvalue');
