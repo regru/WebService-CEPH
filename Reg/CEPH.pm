@@ -45,7 +45,7 @@ sub new {
     # optional
     $self->{$_} = delete $args{$_} for (qw/driver_name multipart_threshold/);
     
-    confess "Unused arguments %args" if %args;
+    confess "Unused arguments: @{[ %args]}" if %args;
     
     $self->{driver_name} ||= "NetAmazonS3";
     $self->{multipart_threshold} ||= MINIMAL_MULTIPART_PART;
