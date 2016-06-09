@@ -108,6 +108,36 @@ sub download {
     return $data;
 }
 
+sub download_with_range {
+    my ($self, $key, $first, $last) = @_;
+    
+    
+    # TODO: How and when to validate ETag here?
+    my $http_request = Net::Amazon::S3::Request::GetObject->new(
+        s3     => $self->{client}->s3,
+        bucket => $self->{bucket},
+        key    => $key,
+        method => 'GET',
+    )->http_request;
+    
+    $last //= '';
+    $http_request->headers->header("Range", "bytes=$first-$last");
+    
+    my $http_response = $self->{client}->_send_request_raw($http_request);
+    print $http_request->as_string, $http_response->as_string ;
+    if ( $http_response->code == 404 && $http_response->decoded_content =~ m!<Code>NoSuchKey</Code>!) {
+        return;
+    }
+    elsif (is_error($http_response->code)) {
+        confess "Unknown error ".$http_response->code;
+    } else {
+        my $range = $http_response->header('Content-Range') // confess;
+        my ($f, $l, $total) = $range =~ m!bytes (\d+)\-(\d+)/(\d+)! or confess;
+        my $left = $total - ( $l + 1);
+        return (\$http_response->decoded_content, $left);
+    }
+}
+
 sub size {
     my ($self, $key) = @_;
     
@@ -122,9 +152,15 @@ sub size {
     if ( $http_response->code == 404) { # It's not possible to distinct between NoSuchkey and NoSuchBucket??
         return undef;
     }
-    confess "Unknown error ".$http_response->code if is_error($http_response->code);
+    elsif (is_error($http_response->code)) {
+        confess "Unknown error ".$http_response->code;
+    }
+    else {
+        return $http_response->header('Content-Length');
+    }
     
-    $http_response->header('Content-Length');
+    
+    
 }
 
 sub delete {

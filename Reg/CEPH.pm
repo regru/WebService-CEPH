@@ -112,7 +112,19 @@ sub upload {
 sub download {
     my ($self, $key) = @_;
     
-    $self->{driver}->download($key); 
+    my $partsize = 2;
+    my $offset = 0;
+    my $data;
+    while() {
+        my ($dataref, $bytesleft) = $self->{driver}->download_with_range($key, $offset, $offset + $partsize);
+        unless ($dataref) {
+            $offset ? confess : return;
+        }
+        $offset += length $$dataref;
+        $data .= $$dataref;
+        last unless $bytesleft;
+    };
+    $data;
 }
 
 =head2 size
