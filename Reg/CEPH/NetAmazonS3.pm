@@ -87,27 +87,6 @@ sub complete_multipart_upload {
 }
 
 
-sub download {
-    my ($self, $key) = @_;
-    
-    # TODO: Net::Amazon::S3 does not validate E-Tag for multipart upload
-    my $object = $self->_request_object->object( key => $key );
-    my $data;
-    eval {
-        $data = $object->get_decoded;
-        1;
-    } or do {
-        my $err = "$@";
-        if ($err =~ /^NoSuchKey:/) {
-            return undef;
-        }
-        else {
-            die $err; # propogate exception 
-        }
-    };
-    return $data;
-}
-
 sub download_with_range {
     my ($self, $key, $first, $last) = @_;
     
@@ -120,21 +99,35 @@ sub download_with_range {
         method => 'GET',
     )->http_request;
     
-    $last //= '';
-    $http_request->headers->header("Range", "bytes=$first-$last");
+    if (defined $first) {
+        $last //= '';
+        $http_request->headers->header("Range", "bytes=$first-$last");
+    }
     
     my $http_response = $self->{client}->_send_request_raw($http_request);
-    print $http_request->as_string, $http_response->as_string ;
+    #print $http_request->as_string, $http_response->as_string ;
     if ( $http_response->code == 404 && $http_response->decoded_content =~ m!<Code>NoSuchKey</Code>!) {
         return;
     }
     elsif (is_error($http_response->code)) {
-        confess "Unknown error ".$http_response->code;
+        my ($err) = $http_response->decoded_content =~ m!<Code>(.*)</Code>!;
+        $err //= 'none';
+        confess "Unknown error ".$http_response->code." $err";
     } else {
-        my $range = $http_response->header('Content-Range') // confess;
-        my ($f, $l, $total) = $range =~ m!bytes (\d+)\-(\d+)/(\d+)! or confess;
-        my $left = $total - ( $l + 1);
-        return (\$http_response->decoded_content, $left);
+        my $left = undef;
+        if (defined $first) {
+            my $range = $http_response->header('Content-Range') // confess;
+            my ($f, $l, $total) = $range =~ m!bytes (\d+)\-(\d+)/(\d+)! or confess;
+            $left = $total - ( $l + 1);
+        }
+        
+        my $etag = $http_response->header('ETag');
+        if ($etag) {
+            $etag =~ s/^"//;
+            $etag =~ s/"$//;
+        }
+        
+        return (\$http_response->decoded_content, $etag, $left);
     }
 }
 

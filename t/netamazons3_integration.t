@@ -132,7 +132,9 @@ XML
 
 test_case "Download single request" => sub {
     my ($msg, $ceph) = @_;
-    is $ceph->download('mykey'), "HeyThere", $msg;
+    my ($dataref, $etag, $left) = $ceph->download_with_range('mykey');
+    is $$dataref, "HeyThere", $msg
+    
 } => sub {
     my ($msg, $connect, $request) = @_;
     die unless $request->url eq '/testbucket/mykey';
@@ -145,7 +147,8 @@ test_case "Download single request" => sub {
 
 test_case "Download zero-size file" => sub {
     my ($msg, $ceph) = @_;
-    is $ceph->download('mykey'), "", $msg;
+    my ($dataref, $etag, $left) = $ceph->download_with_range('mykey');
+    is $$dataref, "", $msg;
 } => sub {
     my ($msg, $connect, $request) = @_;
     die unless $request->url eq '/testbucket/mykey';
@@ -155,22 +158,12 @@ test_case "Download zero-size file" => sub {
     $connect->send_response($resp);
 };
 
-test_case "Download single request with broken md5" => sub {
+test_case "Download unexisting object" => sub {
     my ($msg, $ceph) = @_;
-    ok ! eval { $ceph->download('mykey'); 1 }, $msg;
-    like "$@", qr/Corrupted download/, $msg;
-} => sub {
-    my ($msg, $connect, $request) = @_;
-    my $body = "HeyThere";
-    my $resp = HTTP::Response->new(200, 'OK');
-    $resp->header(ETag => md5_hex('notabody'));
-    $resp->content($body);
-    $connect->send_response($resp);
-};
-
-test_case "Download single request unexisting object" => sub {
-    my ($msg, $ceph) = @_;
-    ok ! defined $ceph->download('mykey'), $msg;
+    my ($dataref, $etag, $left) = $ceph->download_with_range('mykey');
+    ok ! defined $dataref, $msg;
+    ok ! defined $etag, $msg;
+    ok ! defined $left, $msg;
 } => sub {
     my ($msg, $connect, $request) = @_;
     my $resp = HTTP::Response->new(404, 'Not Found');
@@ -188,9 +181,10 @@ XML
     $connect->send_response($resp);
 };
 
-test_case "Download single request wrong bucket" => sub {
+test_case "Download wrong bucket" => sub {
     my ($msg, $ceph) = @_;
-    ok ! eval { $ceph->download('mykey'); 1 }, $msg;
+    ok ! eval { $ceph->download_with_range('mykey'); 1 }, $msg;
+    like "$@", qr/NoSuchBucket/;
 } => sub {
     my ($msg, $connect, $request) = @_;
     my $resp = HTTP::Response->new(404, 'Not Found');
@@ -212,7 +206,8 @@ XML
 
 test_case "multi-segment download" => sub {
     my ($msg, $ceph) = @_;
-    my ($dataref, $left) = $ceph->download_with_range('mykey', 2, 4);
+    my ($dataref, $etag, $left) = $ceph->download_with_range('mykey', 2, 4);
+    is $etag, md5_hex('Xy');
     is $$dataref, 'Xy';
     is $left, 10;
 } => sub {
@@ -221,6 +216,7 @@ test_case "multi-segment download" => sub {
     die unless $request->header('Range') eq 'bytes=2-4';
     my $resp = HTTP::Response->new(206, 'OK');
     $resp->header('Content-Range', 'bytes 2-4/15');
+    $resp->header('ETag', md5_hex('Xy'));
     $resp->content('Xy');
     $connect->send_response($resp);
 };
