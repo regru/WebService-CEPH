@@ -208,6 +208,23 @@ XML
     $connect->send_response($resp);
 };
 
+# multi-segment download
+
+test_case "multi-segment download" => sub {
+    my ($msg, $ceph) = @_;
+    my ($dataref, $left) = $ceph->download_with_range('mykey', 2, 4);
+    is $$dataref, 'Xy';
+    is $left, 10;
+} => sub {
+    my ($msg, $connect, $request) = @_;
+    die unless $request->url eq '/testbucket/mykey';
+    die unless $request->header('Range') eq 'bytes=2-4';
+    my $resp = HTTP::Response->new(206, 'OK');
+    $resp->header('Content-Range', 'bytes 2-4/15');
+    $resp->content('Xy');
+    $connect->send_response($resp);
+};
+
 # size
 
 test_case "Get size" => sub {
