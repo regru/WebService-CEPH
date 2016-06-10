@@ -2,7 +2,7 @@ use strict;
 use warnings;
 use Test::Spec;
 use Reg::CEPH;
-
+use Digest::MD5 qw/md5_hex/;
 #
 # Юнит тест с моками, тестирующий Reg::CEPH, проверяет всю логику что есть в коде.
 # Все вызовы "драйвера" мокируются
@@ -151,6 +151,7 @@ describe CEPH => sub {
         for my $partsdata ([qw/A/], [qw/Aa/], [qw/Aa B/], [qw/Aa Bb/], [qw/Aa Bb C/]) {
             it "multisegment download should work for @$partsdata" => sub {
                 my @parts = @$partsdata;
+                my $etag = md5_hex(join('', @parts));
                 my $expect_offset = 0;
                 $driver->expects('download_with_range')->exactly(scalar @$partsdata)->returns(sub{
                     my ($self, $key, $first, $last) = @_;
@@ -158,11 +159,27 @@ describe CEPH => sub {
                     is $first, $expect_offset;
                     is $last, $first + $ceph->{multisegment_threshold};
                     $expect_offset += $ceph->{multisegment_threshold};
-                    return (\$data, length join('', @parts));
+                    return (\$data, $etag, length join('', @parts));
                 });
                 is $ceph->download($key), join('', @$partsdata);
             };
         }
+        
+        it "multisegment download should crash on wrong etags" => sub {
+            $driver->expects('download_with_range')->exactly(1)->returns(sub{
+                return (\"Test", "696df35ad1161afbeb6ea667e5dd5dab", 0)
+            });
+            ok ! eval { $ceph->download($key); 1 };
+            like "$@",
+                qr/MD5 missmatch, got 0cbc6611f5540bd0809a388dc95a615b, expected 696df35ad1161afbeb6ea667e5dd5dab/;
+        };
+
+        it "multisegment download should not crash on multipart etags" => sub {
+            $driver->expects('download_with_range')->exactly(1)->returns(sub{
+                return (\"Test", "696df35ad1161afbeb6ea667e5dd5dab-2861", 0)
+            });
+            is $ceph->download($key), "Test";
+        };
     };
 };
 
