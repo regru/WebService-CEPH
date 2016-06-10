@@ -180,6 +180,25 @@ describe CEPH => sub {
             });
             is $ceph->download($key), "Test";
         };
+
+        it "multisegment download should return undef when object not exists" => sub {
+            $driver->expects('download_with_range')->exactly(1)->returns(sub{
+                return;
+            });
+            ok ! defined $ceph->download($key);
+        };
+        it "multisegment download should return undef if second chunk of multi segment download missed" => sub {
+            $driver->expects('download_with_range')->exactly(2)->returns(sub{
+                my ($self, $key, $first, $last) = @_;
+                if ($first) {
+                    return;
+                }
+                else {
+                    return (\"Test", "696df35ad1161afbeb6ea667e5dd5dab", 10)
+                }
+            });
+            ok ! defined $ceph->download($key);
+        };
     };
 };
 

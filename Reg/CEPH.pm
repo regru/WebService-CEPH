@@ -119,13 +119,18 @@ sub download {
     my $md5 =  Digest::MD5->new;
     while() {
         my ($dataref, $etag, $bytesleft) = $self->{driver}->download_with_range($key, $offset, $offset + $self->{multisegment_threshold});
+
+        # Если объект не найден - возвращаем undef
+        # даже если при мультисегментном скачивании объект неожиданно исчез на каком-то сегменте, значит
+        # его кто-то удалил, нужно всё же вернуть undef
+        return unless ($dataref);
+
+        # Проверяем md5 только если ETag "нормальный" с md5 (был не multipart upload)
         ($check_md5 )= $etag =~ /^([0-9a-f]+)$/ unless(defined $check_md5);
-        unless ($dataref) {
-            $offset ? confess : return;
-        }
         if ($check_md5) {
             $md5->add($$dataref);
         }
+        
         $offset += length($$dataref);
         $data .= $$dataref;
         last unless $bytesleft;
