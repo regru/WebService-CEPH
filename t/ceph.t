@@ -30,6 +30,7 @@ describe CEPH => sub {
                 %mandatory_params_h,
                 driver_name => 'NetAmazonS3',
                 multipart_threshold => 5*1024*1024,
+                multisegment_threshold => 5*1024*1024,
                 driver =>  $driver,
             };
         };
@@ -50,13 +51,22 @@ describe CEPH => sub {
             is $ceph->{driver_name}, 'XXX';
         };
 
-        it "should override threshold" => sub {
+        it "should override multipart threshold" => sub {
             my $new_threshold = 10_000_000;
             Reg::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
             
             my $ceph = Reg::CEPH->new(@mandatory_params, multipart_threshold => $new_threshold);
             
             is $ceph->{multipart_threshold}, $new_threshold;
+        };
+
+        it "should override multisegment threshold" => sub {
+            my $new_threshold = 10_000_000;
+            Reg::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
+            
+            my $ceph = Reg::CEPH->new(@mandatory_params,multisegment_threshold => $new_threshold);
+            
+            is $ceph->{multisegment_threshold}, $new_threshold;
         };
 
         it "should cath bad threshold" => sub {
@@ -71,13 +81,9 @@ describe CEPH => sub {
         };
     };
     
-    describe methods => sub {
+    describe "other methods" => sub {
         my $driver = mock();
         my $ceph = bless +{ driver => $driver }, 'Reg::CEPH';
-        it "should download" => sub {
-            $driver->expects('download')->with('testkey')->returns("testdata");
-            is $ceph->download('testkey'), "testdata";
-        };
         it "should return size" => sub {
             $driver->expects('size')->with('testkey')->returns(42);
             is $ceph->size('testkey'), 42;
@@ -132,6 +138,31 @@ describe CEPH => sub {
             $ceph->upload($key, '');
             ok 1;
         };
+    };
+    describe download => sub {
+        my ($driver, $ceph, $key);
+        
+        before each => sub {
+            $driver = mock();
+            $ceph = bless +{ driver => $driver, multisegment_threshold => 2 }, 'Reg::CEPH';
+            $key = 'mykey';
+        };
+        
+        for my $partsdata ([qw/A/], [qw/Aa/], [qw/Aa B/], [qw/Aa Bb/], [qw/Aa Bb C/]) {
+            it "multisegment download should work for @$partsdata" => sub {
+                my @parts = @$partsdata;
+                my $expect_offset = 0;
+                $driver->expects('download_with_range')->exactly(scalar @$partsdata)->returns(sub{
+                    my ($self, $key, $first, $last) = @_;
+                    my $data = shift(@parts);
+                    is $first, $expect_offset;
+                    is $last, $first + $ceph->{multisegment_threshold};
+                    $expect_offset += $ceph->{multisegment_threshold};
+                    return (\$data, length join('', @parts));
+                });
+                is $ceph->download($key), join('', @$partsdata);
+            };
+        }
     };
 };
 

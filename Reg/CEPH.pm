@@ -43,13 +43,14 @@ sub new {
     # mandatory
     $self->{$_} = delete $args{$_} // confess "Missing $_" for (qw/protocol host bucket key secret/);
     # optional
-    $self->{$_} = delete $args{$_} for (qw/driver_name multipart_threshold/);
+    $self->{$_} = delete $args{$_} for (qw/driver_name multipart_threshold multisegment_threshold/);
     
     confess "Unused arguments: @{[ %args]}" if %args;
     
     $self->{driver_name} ||= "NetAmazonS3";
     $self->{multipart_threshold} ||= MINIMAL_MULTIPART_PART;
-    
+    $self->{multisegment_threshold}  ||= MINIMAL_MULTIPART_PART;
+            
     confess "multipart_threshold should be greater or eq. MINIMAL_MULTIPART_PART (5Mb) (now multipart_threshold=$self->{multipart_threshold}"
         if $self->{multipart_threshold} < MINIMAL_MULTIPART_PART;
     
@@ -112,15 +113,14 @@ sub upload {
 sub download {
     my ($self, $key) = @_;
     
-    my $partsize = 2;
     my $offset = 0;
     my $data;
     while() {
-        my ($dataref, $bytesleft) = $self->{driver}->download_with_range($key, $offset, $offset + $partsize);
+        my ($dataref, $bytesleft) = $self->{driver}->download_with_range($key, $offset, $offset + $self->{multisegment_threshold});
         unless ($dataref) {
             $offset ? confess : return;
         }
-        $offset += length $$dataref;
+        $offset += length($$dataref);
         $data .= $$dataref;
         last unless $bytesleft;
     };
