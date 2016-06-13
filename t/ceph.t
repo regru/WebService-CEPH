@@ -114,7 +114,8 @@ describe CEPH => sub {
         
         for my $partsdata ([qw/Aa B/], [qw/Aa Bb/], [qw/Aa Bb C/]) {
             it "multipart upload should work for @$partsdata" => sub {
-                $driver->expects('initiate_multipart_upload')->with($key)->returns($multipart_data);
+                my $data_s = join('', @$partsdata);
+                $driver->expects('initiate_multipart_upload')->with($key, md5_hex($data_s))->returns($multipart_data);
                 my (@parts, @data);
                 $driver->expects('upload_part')->exactly(scalar @$partsdata)->returns(sub{
                     my ($self, $md, $part_no, $chunk) = @_;
@@ -123,7 +124,7 @@ describe CEPH => sub {
                     push @data, $chunk;
                 });
                 $driver->expects('complete_multipart_upload')->with($multipart_data);
-                $ceph->upload($key, join('', @$partsdata));
+                $ceph->upload($key, $data_s);
                 cmp_deeply [@parts], [map $_, 1..@$partsdata];
                 cmp_deeply [@data], $partsdata;
             };
@@ -163,7 +164,7 @@ describe CEPH => sub {
         for my $partsdata ([qw/A/], [qw/Aa/], [qw/Aa B/], [qw/Aa Bb/], [qw/Aa Bb C/]) {
             it "multisegment download should work for @$partsdata" => sub {
                 my @parts = @$partsdata;
-                my $etag = md5_hex(join('', @parts));
+                my $md5 = md5_hex(join('', @parts));
                 my $expect_offset = 0;
                 $driver->expects('download_with_range')->exactly(scalar @$partsdata)->returns(sub{
                     my ($self, $key, $first, $last) = @_;
@@ -171,7 +172,7 @@ describe CEPH => sub {
                     is $first, $expect_offset;
                     is $last, $first + $ceph->{multisegment_threshold};
                     $expect_offset += $ceph->{multisegment_threshold};
-                    return (\$data, $etag, length join('', @parts));
+                    return (\$data, length(join('', @parts)), $md5, $md5);
                 });
                 is $ceph->download($key), join('', @$partsdata);
             };
@@ -179,7 +180,7 @@ describe CEPH => sub {
         
         it "multisegment download should crash on wrong etags" => sub {
             $driver->expects('download_with_range')->exactly(1)->returns(sub{
-                return (\"Test", "696df35ad1161afbeb6ea667e5dd5dab", 0)
+                return (\"Test", 0, "696df35ad1161afbeb6ea667e5dd5dab")
             });
             ok ! eval { $ceph->download($key); 1 };
             like "$@",
@@ -188,9 +189,27 @@ describe CEPH => sub {
 
         it "multisegment download should not crash on multipart etags" => sub {
             $driver->expects('download_with_range')->exactly(1)->returns(sub{
-                return (\"Test", "696df35ad1161afbeb6ea667e5dd5dab-2861", 0)
+                return (\"Test", 0, "696df35ad1161afbeb6ea667e5dd5dab-2861")
             });
             is $ceph->download($key), "Test";
+        };
+
+        it "multisegment download should crash on wrong custom md5" => sub {
+            $driver->expects('download_with_range')->exactly(1)->returns(sub{
+                return (\"Test", 0, "696df35ad1161afbeb6ea667e5dd5dab-2861", '42aef892dfb5a85d191e9fba6054f700')
+            });
+            ok ! eval { $ceph->download($key); 1 };
+            like "$@",
+                qr/MD5 missmatch, got 0cbc6611f5540bd0809a388dc95a615b, expected 42aef892dfb5a85d191e9fba6054f700/;
+        };
+
+        it "multisegment download should crash when etag and custom etag differs" => sub {
+            $driver->expects('download_with_range')->exactly(1)->returns(sub{
+                return (\"Test", 0, "696df35ad1161afbeb6ea667e5dd5dab", '42aef892dfb5a85d191e9fba6054f700')
+            });
+            ok ! eval { $ceph->download($key); 1 };
+            like "$@",
+                qr/ETag looks like valid md5 and x\-amz\-meta\-md5 presents but they do not match/;
         };
 
         it "multisegment download should return undef when object not exists" => sub {
@@ -206,7 +225,7 @@ describe CEPH => sub {
                     return;
                 }
                 else {
-                    return (\"Test", "696df35ad1161afbeb6ea667e5dd5dab", 10)
+                    return (\"Test", 10, "696df35ad1161afbeb6ea667e5dd5dab")
                 }
             });
             ok ! defined $ceph->download($key);

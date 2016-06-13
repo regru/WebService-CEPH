@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Carp;
 use Reg::CEPH::NetAmazonS3;
+use Digest::MD5 qw/md5_hex/;
 
 =encoding utf8
 
@@ -86,7 +87,7 @@ sub upload {
 
     if (length($_[0]) > $self->{multipart_threshold}) {
         
-        my $multipart = $self->{driver}->initiate_multipart_upload($key);
+        my $multipart = $self->{driver}->initiate_multipart_upload($key, md5_hex($_[0]));
         
         my $len = length($_[0]);
         my $offset = 0;
@@ -127,7 +128,7 @@ sub download {
     my $check_md5 = undef;
     my $md5 =  Digest::MD5->new;
     while() {
-        my ($dataref, $etag, $bytesleft) = $self->{driver}->download_with_range($key, $offset, $offset + $self->{multisegment_threshold});
+        my ($dataref, $bytesleft, $etag, $custom_md5) = $self->{driver}->download_with_range($key, $offset, $offset + $self->{multisegment_threshold});
 
         # Если объект не найден - возвращаем undef
         # даже если при мультисегментном скачивании объект неожиданно исчез на каком-то сегменте, значит
@@ -135,7 +136,20 @@ sub download {
         return unless ($dataref);
 
         # Проверяем md5 только если ETag "нормальный" с md5 (был не multipart upload)
-        ($check_md5 )= $etag =~ /^([0-9a-f]+)$/ unless(defined $check_md5);
+        if (!defined $check_md5) {
+            my ($etag_md5) = $etag =~ /^([0-9a-f]+)$/;
+            
+            #print "ETAG $etag_md5 CUSTOM $custom_md5\n";
+            confess "ETag looks like valid md5 and x-amz-meta-md5 presents but they do not match"
+                if ($etag_md5 && $custom_md5 && $etag_md5 ne $custom_md5);
+            if ($etag_md5) {
+                $check_md5 = $etag_md5;
+            } elsif ($custom_md5) {
+                $check_md5 = $custom_md5;
+            } else {
+                $check_md5 = 0;
+            }
+        }
         if ($check_md5) {
             $md5->add($$dataref);
         }

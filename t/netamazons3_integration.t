@@ -38,6 +38,7 @@ test_case "Upload single request" => sub {
     my ($msg, $connect, $request) = @_;
     die unless $request->url eq '/testbucket/my%20key';
     die unless $request->header('Content-MD5') eq '1ySnE1zn0lk8JfxSEtQSWg==';
+    die unless $request->header('X-Amz-Meta-Md5') eq 'd724a7135ce7d2593c25fc5212d4125a';
     die unless $request->content eq 'myvalue';
     my $resp = HTTP::Response->new(200, 'OK');
     $resp->header(ETag => md5_hex($request->content));
@@ -87,12 +88,13 @@ test_case "Upload single request with broken md5" => sub {
 
 test_case "Multipart upload" => sub {
     my ($msg, $ceph) = @_;
-    my $multipart_data = $ceph->initiate_multipart_upload('mykey', 'myvalue');
+    my $multipart_data = $ceph->initiate_multipart_upload('mykey', 'somemd5');
     $ceph->upload_part($multipart_data, 1, "P1");
     $ceph->upload_part($multipart_data, 2, "P2");
     $ceph->complete_multipart_upload($multipart_data);
 } => sub {
     my ($msg, $connect, $request) = @_;
+    die "Wrong md5" unless $request->header('X-Amz-Meta-Md5') eq 'somemd5';
     my $resp = HTTP::Response->new(200, 'OK');
     $resp->content(<<'XML');
 <?xml version="1.0" encoding="UTF-8"?>
@@ -132,7 +134,7 @@ XML
 
 test_case "Download single request" => sub {
     my ($msg, $ceph) = @_;
-    my ($dataref, $etag, $left) = $ceph->download_with_range('mykey');
+    my ($dataref, $left, $etag, $custom_md5) = $ceph->download_with_range('mykey');
     is $$dataref, "HeyThere", $msg
     
 } => sub {
@@ -147,7 +149,7 @@ test_case "Download single request" => sub {
 
 test_case "Download zero-size file" => sub {
     my ($msg, $ceph) = @_;
-    my ($dataref, $etag, $left) = $ceph->download_with_range('mykey');
+    my ($dataref, $left, $etag, $custom_md5) = $ceph->download_with_range('mykey');
     is $$dataref, "", $msg;
 } => sub {
     my ($msg, $connect, $request) = @_;
@@ -160,7 +162,7 @@ test_case "Download zero-size file" => sub {
 
 test_case "Download unexisting object" => sub {
     my ($msg, $ceph) = @_;
-    my ($dataref, $etag, $left) = $ceph->download_with_range('mykey');
+    my ($dataref, $left, $etag, $custom_md5) = $ceph->download_with_range('mykey');
     ok ! defined $dataref, $msg;
     ok ! defined $etag, $msg;
     ok ! defined $left, $msg;
@@ -206,7 +208,7 @@ XML
 
 test_case "multi-segment download" => sub {
     my ($msg, $ceph) = @_;
-    my ($dataref, $etag, $left) = $ceph->download_with_range('mykey', 2, 4);
+    my ($dataref, $left, $etag, $custom_md5) = $ceph->download_with_range('mykey', 2, 4);
     is $etag, md5_hex('Xy');
     is $$dataref, 'Xy';
     is $left, 10;

@@ -46,17 +46,30 @@ sub _request_object {
 sub upload_single_request {
     my ($self, $key) = (shift, shift);
 
-    $self->_request_object->object( key => $key, acl_short => 'private' )->put($_[0]);
+    my $md5 = md5_hex($_[0]);
+    my $object = $self->_request_object->object( key => $key, acl_short => 'private' );
+    $object->user_metadata->{'md5'} = $md5;
+    $object->_put($_[0], length($_[0]), $md5); # private _put so we can re-use md5. only for that.
 }
 
 sub initiate_multipart_upload {
-    my ($self, $key) = @_;
-    
+    my ($self, $key, $md5) = @_;
+
     my $object = $self->_request_object->object( key => $key, acl_short => 'private' );
     
-    my $upload_id = $object->initiate_multipart_upload;
+    my $http_request = Net::Amazon::S3::Request::InitiateMultipartUpload->new(
+        s3     => $self->{client}->s3,
+        bucket => $self->{bucket},
+        key    => $key,
+        headers => +{ 'X-Amz-Meta-Md5' => $md5 }
+    )->http_request;
     
-    +{ key => $key, upload_id => $upload_id, object => $object};
+    my $xpc = $self->{client}->_send_request_xpc($http_request);
+    my $upload_id = $xpc->findvalue('//s3:UploadId');
+    confess "Couldn't get upload id from initiate_multipart_upload response XML"
+      unless $upload_id;
+    
+    +{ key => $key, upload_id => $upload_id, object => $object, md5 => $md5};
 }
 
 sub upload_part {
@@ -127,7 +140,9 @@ sub download_with_range {
             $etag =~ s/"$//;
         }
         
-        return (\$http_response->decoded_content, $etag, $left);
+        my $custom_md5 = $http_response->header('X-Amz-Meta-Md5');
+        
+        return (\$http_response->decoded_content, $left, $etag, $custom_md5);
     }
 }
 
