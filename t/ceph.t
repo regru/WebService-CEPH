@@ -88,10 +88,18 @@ describe CEPH => sub {
             $driver->expects('size')->with('testkey')->returns(42);
             is $ceph->size('testkey'), 42;
         };
+        it "size should confess on non-ascii data" => sub {
+            $driver->expects('size')->never;
+            ok ! eval { $ceph->size("key\x{b5}"); 1 };
+        };
         it "should delete" => sub {
             $driver->expects('delete')->with('testkey');
             $ceph->delete('testkey');
             ok 1;
+        };
+        it "delete should confess on non-ascii data" => sub {
+            $driver->expects('delete')->never;
+            ok ! eval { $ceph->delete("key\x{b5}"); 1 };
         };
     };
     describe upload => sub {
@@ -137,6 +145,10 @@ describe CEPH => sub {
             $driver->expects('upload_single_request')->with($key, '');
             $ceph->upload($key, '');
             ok 1;
+        };
+        it "upload should confess on non-ascii data" => sub {
+            $driver->expects('upload_single_request')->never;
+            ok ! eval { $ceph->upload("key\x{b5}", "a"); 1 };
         };
     };
     describe download => sub {
@@ -198,6 +210,10 @@ describe CEPH => sub {
                 }
             });
             ok ! defined $ceph->download($key);
+        };
+        it "download should confess on non-ascii data" => sub {
+            $driver->expects('download_with_range')->never;
+            ok ! eval { $ceph->download("key\x{b5}"); 1 };
         };
     };
 };

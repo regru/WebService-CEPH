@@ -16,6 +16,8 @@ use Reg::CEPH::NetAmazonS3;
 
 use constant MINIMAL_MULTIPART_PART => 5*1024*1024;
 
+sub _check_ascii_key { confess "Key should be ASCII-only" unless $_[0] !~ /[^\x00-\x7f]/ }
+
 =head2 new
 
 Конструктор.
@@ -79,6 +81,8 @@ sub new {
 
 sub upload {
     my ($self, $key) = (shift, shift);
+    
+    _check_ascii_key($key);
 
     if (length($_[0]) > $self->{multipart_threshold}) {
         
@@ -108,10 +112,15 @@ sub upload {
 Скачивает данные с именем $key и возвращает их.
 Если ключ не существует, возвращает undef.
 
+Если размер объекта по факту окажется больше multisegment_threshold,
+объект будет скачан несколькими запросами с заголовком Range (т.е. multi segment download).
+
 =cut
 
 sub download {
     my ($self, $key) = @_;
+    
+    _check_ascii_key($key);
     
     my $offset = 0;
     my $data;
@@ -152,6 +161,8 @@ sub download {
 sub size {
     my ($self, $key) = @_;
     
+    _check_ascii_key($key);
+    
     $self->{driver}->size($key); 
 }
 
@@ -164,6 +175,8 @@ sub size {
 
 sub delete {
     my ($self, $key) = @_;
+    
+    _check_ascii_key($key);
     
     $self->{driver}->delete($key); 
 }
