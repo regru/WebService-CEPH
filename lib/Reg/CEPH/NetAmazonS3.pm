@@ -24,6 +24,8 @@
 
 package Reg::CEPH::NetAmazonS3;
 
+# VERSION
+
 use strict;
 use warnings;
 use Carp;

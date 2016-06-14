@@ -1,6 +1,10 @@
 =encoding utf8
 
-=head1 CEPH
+=head1 NAME
+
+Reg::CEPH
+
+=head1 DESCRIPTION
 
 Клинт для CEPH, без низкоуровневого кода для общения с библиотекой Amazon S3
 (она вынесена в отдельный класс).
@@ -11,6 +15,8 @@
 =cut
 
 package Reg::CEPH;
+
+# VERSION
 
 use strict;
 use warnings;
