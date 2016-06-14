@@ -1,11 +1,3 @@
-package Reg::CEPH;
-
-use strict;
-use warnings;
-use Carp;
-use Reg::CEPH::NetAmazonS3;
-use Digest::MD5 qw/md5_hex/;
-
 =encoding utf8
 
 =head1 CEPH
@@ -14,6 +6,14 @@ use Digest::MD5 qw/md5_hex/;
 (она вынесена в отдельный класс)
 
 =cut
+
+package Reg::CEPH;
+
+use strict;
+use warnings;
+use Carp;
+use Reg::CEPH::NetAmazonS3;
+use Digest::MD5 qw/md5_hex/;
 
 use constant MINIMAL_MULTIPART_PART => 5*1024*1024;
 
@@ -110,8 +110,8 @@ sub upload {
 
 =head2 download
 
-Скачивает данные с именем $key и возвращает их.
-Если ключ не существует, возвращает undef.
+Скачивает данные объекта с именем $key и возвращает их.
+Если объект не существует, возвращает undef.
 
 Если размер объекта по факту окажется больше multisegment_threshold,
 объект будет скачан несколькими запросами с заголовком Range (т.е. multi segment download).
@@ -167,7 +167,7 @@ sub download {
 
 =head2 size
 
-Возвращает данные размер ключа с именем $key в байтах,
+Возвращает размер объекта с именем $key в байтах,
 если ключ не существует, возвращает undef
 
 =cut
@@ -182,7 +182,7 @@ sub size {
 
 =head2 delete
 
-Удаляет ключ с именем $key, ничего не возвращает. Если ключ
+Удаляет объект с именем $key, ничего не возвращает. Если объект
 не существует, не выдаёт ошибку
 
 =cut

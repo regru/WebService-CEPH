@@ -1,3 +1,27 @@
+=encoding utf8
+
+=head1 Reg::CEPH::NetAmazonS3
+
+Драйвер для CEPH на базе Net::Amazon::S3.
+
+Сделан скорее не на базе Net::Amazon::S3, а на базе Net::Amazon::S3::Client
+см. POD https://metacpan.org/pod/Net::Amazon::S3::Client, там отдельная документация
+и сказано что это более новый интерфейс, при этом в докции Net::Amazon::S3 ссылки на это нет.
+
+Лезет в приватные методы и не документированные возможности Net::Amazon::S3,
+в связи с тем что Net::Amazon::S3 сложно назвать документированным в принципе, а публичного
+функционала не хватает.
+
+Стабильность такого решения обеспечивается интеграционным тестом netamazons3_integration,
+который по идее потестирует всё-всё. Проблемы могут быть только если вы поставили этот
+модуль, затем обновили Net::Amazon::S3 на новую, ещё не существующую версию, которая
+сломала обратную совместимость приватных методов.
+
+Интерфейс данного модуля документирован. Придерживайтесь того что документировано, Reg::CEPH
+на всё это рассчитывает. Можете написать свой драйвер с таким же интерфейсом, но с другой реализацией.
+
+=cut
+
 package Reg::CEPH::NetAmazonS3;
 
 use strict;
@@ -7,11 +31,19 @@ use Net::Amazon::S3;
 use HTTP::Status;
 use Digest::MD5 qw/md5_hex/;
 
-=encoding utf8
-
-=cut
-
 =head2 new
+
+Конструктор
+
+protocol - 'http' или 'https'
+
+host - хост Amazon S3 или CEPH
+
+bucket - имя бакета, этот бакет будет использоваться для всех операций объекта
+
+key - ключ доступа
+
+secret - секретный секрет
 
 =cut
 
@@ -35,6 +67,12 @@ sub new {
     $self;
 }
 
+=head2 _request_object
+
+Приватный метод. Возвращает объект Net::Amazon::S3::Client::Bucket, который затем может использоваться.
+Используется в коде несколько раз
+
+=cut
 
 sub _request_object {
     my ($self) = @_;
@@ -42,6 +80,23 @@ sub _request_object {
     $self->{client}->bucket(name => $self->{bucket});
 }
 
+=head2 upload_single_request
+
+Закачивает данные.
+
+Параметры:
+
+1) $self
+
+2) $key - имя объекта
+
+3) сами данные (блоб)
+
+
+Закачивает объект за один запрос (не-multipart upload), ставит приватный ACL,
+добавляет кастомный заголовок x-amz-meta-md5, который равен md5 hex от файла
+
+=cut
 
 sub upload_single_request {
     my ($self, $key) = (shift, shift);
@@ -51,6 +106,25 @@ sub upload_single_request {
     $object->user_metadata->{'md5'} = $md5;
     $object->_put($_[0], length($_[0]), $md5); # private _put so we can re-use md5. only for that.
 }
+
+=head2 initiate_multipart_upload
+
+Инициирует multipart upload
+
+Параметры:
+
+1) $self
+
+2) $key - имя объекта
+
+3) md5 от данных
+
+Инициирует multipart upload, устанавливает x-amz-meta-md5 в значение md5 файла (нужно посчитать
+заранее и передать как параметр).
+Возвращает ссылку на структуру, недокументированной природы, которая в дальнейшем должна
+использоваться для работы с этим multipart upload
+
+=cut
 
 sub initiate_multipart_upload {
     my ($self, $key, $md5) = @_;
@@ -72,12 +146,29 @@ sub initiate_multipart_upload {
     +{ key => $key, upload_id => $upload_id, object => $object, md5 => $md5};
 }
 
+=head2 upload_part
+
+Закачивает часть данных при multipart upload'е
+
+Параметры:
+
+1) $self
+
+2) $multipart_upload - ссылка, полученная из initiate_multipart_upload
+
+3) $part_number - номер части, от 1 и выше.
+
+Работает только если части закачивались по очереди, с возрастающими номерами
+(что естественно, если это последовательная закачка, и делает невозможным паралллельную
+закачку из разных процессов)
+
+Ничего не возвращает
+
+=cut
+
 sub upload_part {
-    
-    #use Data::Dumper;print Dumper \@_;
     my ($self, $multipart_upload, $part_number) = (shift, shift, shift);
     
-    #print "VALUE $_[0]\n";
     $multipart_upload->{object}->put_part(
         upload_id => $multipart_upload->{upload_id},
         part_number => $part_number,
@@ -89,6 +180,20 @@ sub upload_part {
     push @{$multipart_upload->{etags} ||= [] }, md5_hex($_[0]);
 }
 
+=head2 complete_multipart_upload
+
+Финализирует multipart upload
+
+Параметры:
+
+1) $self
+
+2) $multipart_upload - ссылка, полученная из initiate_multipart_upload
+
+ничего не возвращает. падает с исчлючением, если что-то не так.
+
+=cut
+
 sub complete_multipart_upload {
     my ($self, $multipart_upload) = @_;
     
@@ -99,6 +204,35 @@ sub complete_multipart_upload {
     );
 }
 
+=head2 download_with_range
+
+Скачивает объект с заголовком HTTP Range (т.е. часть данных).
+
+Параметры:
+
+1) $self
+
+2) $key - имя объекта
+
+3) $first - первый байт для Range
+
+4) $last - последний байт для Range
+
+Если $first, $last отсутствуют или undef, скачивается весь файл, без заголовка Range
+Если $last отсутствует, скачивает данные с определённой позиции и до конца (так же как в спецификации Range)
+Если объект отсутствует, возвращает пустой список. Если другая ошибка - исключение.
+
+Возвращает:
+
+1) Scalar Ref на скачанные данные
+
+2) Количество оставшихся байтов, которые ещё можно скачать (или undef, если параметра $first не было)
+
+3) ETag заголовок с удалёнными кавычками (или undef если его нет)
+
+4) X-Amz-Meta-Md5 заголовок (или undef, если его нет)
+
+=cut
 
 sub download_with_range {
     my ($self, $key, $first, $last) = @_;
@@ -146,6 +280,21 @@ sub download_with_range {
     }
 }
 
+=head2 size
+
+Получает размер объекта с помощью HTTP HEAD запроса.
+
+Параметры:
+
+1) $self
+
+2) $key - имя объекта
+
+Если объект отсутствует, возвращает undef. Если другая ошибка - исключение.
+Возвращает размер, в байтах.
+
+=cut
+
 sub size {
     my ($self, $key) = @_;
     
@@ -170,6 +319,20 @@ sub size {
     
     
 }
+
+=head2 delete
+
+Удаляет объект
+
+Параметры:
+
+1) $self
+
+2) $key - имя объекта
+
+Ничего не возвращает. Если объект не сузществовал, никак об этом не сигнализирует.
+
+=cut
 
 sub delete {
     my ($self, $key) = @_;
