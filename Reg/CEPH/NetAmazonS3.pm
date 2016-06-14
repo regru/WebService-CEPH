@@ -54,12 +54,13 @@ sub new {
     
     $self->{$_} = delete $args{$_} // confess "Missing $_" for (qw/protocol host bucket key secret/);
     confess "Unused arguments %args" if %args;
-    
+    confess "protocol should be 'http' or 'https'" unless $self->{protocol} =~ /^https?$/;
     
     my $s3 = Net::Amazon::S3->new({
         aws_access_key_id     => $self->{key},
         aws_secret_access_key => $self->{secret}, # TODO: фильтровать в логировании?
         host                  => $self->{host},
+        secure                => $self->{protocol} eq 'https',
         retry                 => 1,
     });
     
