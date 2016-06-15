@@ -44,7 +44,8 @@ secret - secret для входа
 Необязательные параметры:
 
 driver_name - в данный момент только 'NetAmazonS3'
-multipart_threshold - после какого размера файла начинать multipart upload
+multipart_threshold - после какого размера файла (в байтах) начинать multipart upload
+multisegment_threshold - после какого размера файла (в байтах) будет multisegment download
 
 =cut
 
