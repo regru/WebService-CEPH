@@ -190,11 +190,68 @@ sub _upload {
 
 sub download {
     my ($self, $key) = @_;
+    my $data;
+    _download($self, $key, sub { $data .= $_[0] }) or return;
+    $data;
+}
+
+=head2 download_to_file
+
+Скачивает данные объекта с именем $key в файл $fh_or_filename.
+Если объект не существует, возвращает undef (при этом выходной файл всё равно будет испорчен)
+Иначе возвращает размер записанных данных.
+
+Выходной файл открывается в режиме перезаписи, если это имя файла, если это filehandle,
+это может быть append-only файл или пайпа.
+
+Если размер объекта по факту окажется больше multisegment_threshold,
+объект будет скачан несколькими запросами с заголовком Range (т.е. multi segment download).
+
+=cut
+
+sub download_to_file {
+    my ($self, $key, $fh_or_filename) = @_;
+    
+    my $fh = do {
+        if (ref $fh_or_filename) {
+            $fh_or_filename
+        }
+        else {
+            open my $f, ">", $fh_or_filename;
+            binmode $f;
+            $f;
+        }
+    };
+    
+    my $size = 0;
+    _download($self, $key, sub {
+        $size += length($_[0]);
+        print $fh $_[0] or confess "Error writing to file $!"
+    }) or return;
+    $size;
+}
+
+=head2 _download
+
+Приватный метод для download/download_to_file
+
+Параметры:
+
+1) self
+
+2) имя ключа
+
+3) appender - замыкание в которое будут передаваться данные для записи. оно должно аккумулировать их куда-то
+себе или писать в файл, который оно само знает.
+
+=cut
+
+sub _download {
+    my ($self, $key, $appender) = @_;
     
     _check_ascii_key($key);
     
     my $offset = 0;
-    my $data;
     my $check_md5 = undef;
     my $md5 =  Digest::MD5->new;
     while() {
@@ -209,7 +266,6 @@ sub download {
         if (!defined $check_md5) {
             my ($etag_md5) = $etag =~ /^([0-9a-f]+)$/;
             
-            #print "ETAG $etag_md5 CUSTOM $custom_md5\n";
             confess "ETag looks like valid md5 and x-amz-meta-md5 presents but they do not match"
                 if ($etag_md5 && $custom_md5 && $etag_md5 ne $custom_md5);
             if ($etag_md5) {
@@ -225,14 +281,14 @@ sub download {
         }
         
         $offset += length($$dataref);
-        $data .= $$dataref;
+        $appender->($$dataref);
         last unless $bytesleft;
     };
     if ($check_md5) {
         my $got_md5 = $md5->hexdigest;
         confess "MD5 missmatch, got $got_md5, expected $check_md5" unless $got_md5 eq $check_md5;
     }
-    $data;
+    1;
 }
 
 =head2 size

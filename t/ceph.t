@@ -315,6 +315,62 @@ describe CEPH => sub {
             ok ! eval { $ceph->download("key\x{b5}"); 1 };
         };
     };
+    describe download_to_file => sub {
+        my ($driver, $ceph, $key);
+        
+        before each => sub {
+            $driver = mock();
+            $ceph = bless +{ driver => $driver, multisegment_threshold => 2 }, 'Reg::CEPH';
+            $key = 'mykey';
+        };
+        
+        for my $partsdata ([qw/A/], [qw/Aa/], [qw/Aa B/], [qw/Aa Bb/], [qw/Aa Bb C/]) {
+            it "multisegment download should work for @$partsdata" => sub {
+                my $datafile = "$tmp_dir/datafile";
+                
+                my @parts = @$partsdata;
+                my $md5 = md5_hex(join('', @parts));
+                my $expect_offset = 0;
+                $driver->expects('download_with_range')->exactly(scalar @$partsdata)->returns(sub{
+                    my ($self, $key, $first, $last) = @_;
+                    my $data = shift(@parts);
+                    is $first, $expect_offset;
+                    is $last, $first + $ceph->{multisegment_threshold};
+                    $expect_offset += $ceph->{multisegment_threshold};
+                    return (\$data, length(join('', @parts)), $md5, $md5);
+                });
+                my $data = join('', @$partsdata);
+                is $ceph->download_to_file($key, $datafile), length $data;
+                open my $f, "<", $datafile;
+                binmode $f;
+                my @data_a = <$f>;
+                my $data_s = join('', @data_a);
+                is $data_s, $data;
+            };
+        }
+        it "multisegment download should work for filehanlde" => sub {
+            my $datafile = "$tmp_dir/datafile";
+            my $data = "Ab";
+            my $md5 = md5_hex('Ab');
+            my $expect_offset = 0;
+            $driver->expects('download_with_range')->returns(sub{
+                my ($self, $key, $first, $last) = @_;
+                return (\"Ab", 0, $md5, $md5);
+            });
+            is $ceph->download_to_file($key, $datafile), 2;
+            open my $f, "<", $datafile;
+            binmode $f;
+            my @data_a = <$f>;
+            my $data_s = join('', @data_a);
+            is $data_s, 'Ab';
+        };
+        it "download to file should return undef when object not exists" => sub {
+            $driver->expects('download_with_range')->exactly(1)->returns(sub{
+                return;
+            });
+            ok ! defined $ceph->download_to_file($key, "$tmp_dir/datafile");
+        };
+    };
 };
 
 runtests unless caller;
