@@ -23,6 +23,7 @@ use warnings;
 use Carp;
 use Reg::CEPH::NetAmazonS3;
 use Digest::MD5 qw/md5_hex/;
+use Fcntl qw/:seek/;
 
 use constant MINIMAL_MULTIPART_PART => 5*1024*1024;
 
@@ -86,23 +87,83 @@ sub new {
 1-й - имя ключа
 2-й - скаляр, данные ключа
 
-
 =cut
 
 sub upload {
     my ($self, $key) = (shift, shift);
+    $self->_upload($key, sub { substr($_[0], $_[1], $_[2]) }, length($_[0]), md5_hex($_[0]), $_[0]);
+}
+
+=head2 upload_from_file
+
+То же, что upload, но происходит чтение из файла.
+Параметры:
+0-й - $self
+1-й - имя ключа
+2-й - имя файла (если скаляр), иначе открытый filehandle
+
+Дваждый проходит по файлу, высчитывая md5. Файл не должен быть пайпом, его размер не должен меняться.
+
+=cut
+
+sub upload_from_file {
+    my ($self, $key, $fh_or_filename) = @_;
+    my $fh = do {
+        if (ref $fh_or_filename) {
+            seek($fh_or_filename, 0, SEEK_SET);
+            $fh_or_filename
+        }
+        else {
+            open my $f, "<", $fh_or_filename;
+            binmode $f;
+            $f;
+        }
+    };
+    
+    my $md5 = Digest::MD5->new;
+    $md5->addfile($fh);
+    seek($fh, 0, SEEK_SET);
+    
+    $self->_upload($key, sub { read($_[0], my $data, $_[2]) // confess "Error reading data $!\n"; $data }, -s $fh, $md5->hexdigest, $fh);
+}
+
+=head2 _upload
+
+Приватный метод для upload/upload_from_file
+
+Параметры
+
+1) self
+
+2) ключ
+
+3) итератор с интерфейсом (данные, оффсет, длина). "данные" должны соответствовать последнему
+параметру этой функции (т.е. (6))
+
+4) длина данных
+
+5) заранее высчитанный md5 от данных
+
+6) данные. или скаляр. или filehandle
+
+=cut
+
+
+sub _upload {
+    # after that $_[0] is data (scalar or filehandle)
+    my ($self, $key, $iterator, $length, $md5_hex) = (shift, shift, shift, shift, shift);
     
     _check_ascii_key($key);
 
-    if (length($_[0]) > $self->{multipart_threshold}) {
+    if ($length > $self->{multipart_threshold}) {
         
-        my $multipart = $self->{driver}->initiate_multipart_upload($key, md5_hex($_[0]));
+        my $multipart = $self->{driver}->initiate_multipart_upload($key, $md5_hex);
         
-        my $len = length($_[0]);
+        my $len = $length;
         my $offset = 0;
         my $part = 0;
         while ($offset < $len) {
-            my $chunk = substr($_[0], $offset, $self->{multipart_threshold});
+            my $chunk = $iterator->($_[0], $offset, $self->{multipart_threshold});
             
             $self->{driver}->upload_part($multipart, ++$part, $chunk);
             
@@ -111,7 +172,7 @@ sub upload {
         $self->{driver}->complete_multipart_upload($multipart);
     }
     else {
-        $self->{driver}->upload_single_request($key, $_[0]);
+        $self->{driver}->upload_single_request($key, $iterator->($_[0], 0, $length));
     }
  
     return;   

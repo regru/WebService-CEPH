@@ -2,11 +2,24 @@ use strict;
 use warnings;
 use Test::Spec;
 use Reg::CEPH;
+use File::Temp qw/tempdir/;
 use Digest::MD5 qw/md5_hex/;
 #
 # Юнит тест с моками, тестирующий Reg::CEPH, проверяет всю логику что есть в коде.
 # Все вызовы "драйвера" мокируются
 #
+
+my $tmp_dir = tempdir(CLEANUP => 1);
+
+sub create_temp_file {
+    my ($data) = @_;
+
+    my $datafile = "$tmp_dir/data";
+    open my $f, ">", $datafile or die "$!";
+    print $f $data;
+    close $f;
+    $datafile;
+}
 
 describe CEPH => sub {
     describe constructor => sub {
@@ -150,6 +163,73 @@ describe CEPH => sub {
         it "upload should confess on non-ascii data" => sub {
             $driver->expects('upload_single_request')->never;
             ok ! eval { $ceph->upload("key\x{b5}", "a"); 1 };
+        };
+    };
+    describe upload_from_file => sub {
+        my ($driver, $ceph, $multipart_data, $key);
+        
+        before each => sub {
+            $driver = mock();
+            $ceph = bless +{ driver => $driver, multipart_threshold => 2 }, 'Reg::CEPH';
+            $multipart_data = mock();
+            $key = 'mykey';
+        };
+        
+        for my $partsdata ([qw/Aa B/], [qw/Aa Bb/], [qw/Aa Bb C/]) {
+            it "multipart upload should work for @$partsdata" => sub {
+                my $data_s = join('', @$partsdata);
+                my $datafile = create_temp_file($data_s);
+                
+                $driver->expects('initiate_multipart_upload')->with($key, md5_hex($data_s))->returns($multipart_data);
+                my (@parts, @data);
+                $driver->expects('upload_part')->exactly(scalar @$partsdata)->returns(sub{
+                    my ($self, $md, $part_no, $chunk) = @_;
+                    is $md+0, $multipart_data+0;
+                    push @parts, $part_no;
+                    push @data, $chunk;
+                });
+                $driver->expects('complete_multipart_upload')->with($multipart_data);
+                $ceph->upload_from_file($key, $datafile);
+                cmp_deeply [@parts], [map $_, 1..@$partsdata];
+                cmp_deeply [@data], $partsdata;
+            };
+        };
+        
+        it "multipart upload should work for filehandle" => sub {
+            my $data_s = "Hello";
+            my $datafile = create_temp_file($data_s);
+            open my $f, "<", $datafile or die "$!";
+            
+            $driver->expects('initiate_multipart_upload')->with($key, md5_hex('Hello'))->returns($multipart_data);
+            my (@parts, @data);
+            $driver->expects('upload_part')->exactly(3)->returns(sub{
+                my ($self, $md, $part_no, $chunk) = @_;
+                is $md+0, $multipart_data+0;
+                push @parts, $part_no;
+                push @data, $chunk;
+            });
+            $driver->expects('complete_multipart_upload')->with($multipart_data);
+            $ceph->upload_from_file($key, $f);
+            cmp_deeply [@parts], [qw/1 2 3/];
+            cmp_deeply [@data], [qw/He ll o/];
+        };
+
+        it "non-multipart upload should work for filehandle" => sub {
+            my $data_s = "Ab";
+            my $datafile = create_temp_file($data_s);
+           
+            open my $f, "<", $datafile or die "$!";
+
+            $driver->expects('upload_single_request')->with($key, 'Ab');
+            $ceph->upload_from_file($key, $f);
+        };
+
+        it "non-multipart upload should work for file" => sub {
+            my $data_s = "Ab";
+            my $datafile = create_temp_file($data_s);
+            
+            $driver->expects('upload_single_request')->with($key, 'Ab');
+            $ceph->upload_from_file($key, $datafile);
         };
     };
     describe download => sub {
