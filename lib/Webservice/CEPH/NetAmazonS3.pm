@@ -199,7 +199,7 @@ sub upload_part {
 
 sub complete_multipart_upload {
     my ($self, $multipart_upload) = @_;
-    
+die;    
     $multipart_upload->{object}->complete_multipart_upload(
         upload_id => $multipart_upload->{upload_id},
         etags => $multipart_upload->{etags},

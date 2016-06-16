@@ -165,7 +165,7 @@ sub _upload {
         my $part = 0;
         while ($offset < $len) {
             my $chunk = $iterator->($_[0], $offset, $self->{multipart_threshold});
-            
+
             $self->{driver}->upload_part($multipart, ++$part, $chunk);
             
             $offset += $self->{multipart_threshold};
