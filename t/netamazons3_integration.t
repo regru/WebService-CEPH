@@ -272,6 +272,32 @@ test_case "Delete object" => sub {
 };
 
 
+#
+# Non-HTTP tests
+# TODO: can move to separate file
+#
+
+# query_string_authentication_uri
+
+{
+    my $ceph = WebService::CEPH::NetAmazonS3->new(
+        protocol => 'http',
+        host => 'example.com',
+        bucket => 'testbucket',
+        key => 'abc',
+        secret => 'def'
+    );
+    my $expires = time+86400;
+    like
+        $ceph->query_string_authentication_uri('mykey', $expires),
+        qr!http://example.com/testbucket/mykey\?AWSAccessKeyId=abc\&Expires=${expires}\&Signature=!;
+    
+}
+
+#
+# / Non-HTTP tests
+#
+
 ##
 ## Test engine
 ##

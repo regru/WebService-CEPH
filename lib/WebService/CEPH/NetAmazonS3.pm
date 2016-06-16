@@ -53,8 +53,9 @@ sub new {
     my ($class, %args) = @_;
     
     my $self = bless +{}, $class;
-    
+
     $self->{$_} = delete $args{$_} // confess "Missing $_" for (qw/protocol host bucket key secret/);
+
     confess "Unused arguments %args" if %args;
     confess "protocol should be 'http' or 'https'" unless $self->{protocol} =~ /^https?$/;
     
@@ -342,5 +343,18 @@ sub delete {
     
     $self->_request_object->object( key => $key )->delete;
 }
+
+=head2 query_string_authentication_uri
+
+Возвращает Query String Authentication URL для ключа $key, с экспайром $expires
+
+=cut
+
+sub query_string_authentication_uri {
+    my ($self, $key, $expires) = @_;
+    
+    $self->_request_object->object( key => $key, expires => $expires )->query_string_authentication_uri;
+}
+
 
 1;

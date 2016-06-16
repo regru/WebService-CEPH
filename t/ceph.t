@@ -371,6 +371,33 @@ describe CEPH => sub {
             ok ! defined $ceph->download_to_file($key, "$tmp_dir/datafile");
         };
     };
+    describe query_string_authentication_uri => sub {
+        my ($driver, $ceph);
+        before each => sub {
+            $driver = mock();
+            $ceph = bless +{ driver => $driver, multisegment_threshold => 2 }, 'WebService::CEPH';
+        };
+
+        it "should work" => sub {
+            $driver->expects('query_string_authentication_uri')->with(mykey => 42)->returns('myurl');
+            is $ceph->query_string_authentication_uri('mykey', 42), 'myurl';
+        };
+        it "should fix url to host without slash" => sub {
+            $ceph->{query_string_authentication_host_replace} = 'http://example.com';
+            $driver->expects('query_string_authentication_uri')->with(mykey => 42)->returns('http://s3.dc1.example.com/something?more');
+            is $ceph->query_string_authentication_uri('mykey', 42), 'http://example.com/something?more';
+        };
+        it "should fix url to host with slash" => sub {
+            $ceph->{query_string_authentication_host_replace} = 'http://example.com/';
+            $driver->expects('query_string_authentication_uri')->with(mykey => 42)->returns('http://s3.dc1.example.com/something?more');
+            is $ceph->query_string_authentication_uri('mykey', 42), 'http://example.com/something?more';
+        };
+        it "should fix https url to http url" => sub {
+            $ceph->{query_string_authentication_host_replace} = 'http://example.com';
+            $driver->expects('query_string_authentication_uri')->with(mykey => 42)->returns('https://s3.dc1.example.com/something?more');
+            is $ceph->query_string_authentication_uri('mykey', 42), 'http://example.com/something?more';
+        };
+    };
 };
 
 runtests unless caller;

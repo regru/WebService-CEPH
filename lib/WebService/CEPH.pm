@@ -6,6 +6,8 @@ WebService::CEPH
 
 =head1 DESCRIPTION
 
+CEPH client for simple workflow, supporting multipart uploads. Most docs are in Russian.
+
 Клинт для CEPH, без низкоуровневого кода для общения с библиотекой Amazon S3
 (она вынесена в отдельный класс).
 
@@ -36,16 +38,26 @@ sub _check_ascii_key { confess "Key should be ASCII-only" unless $_[0] !~ /[^\x0
 Обязательные параметры:
 
 protocol - http/https
+
 host - хост бэкэнда
+
 bucket - имя бакета
+
 key - ключ для входа
+
 secret - secret для входа
 
 Необязательные параметры:
 
 driver_name - в данный момент только 'NetAmazonS3'
+
 multipart_threshold - после какого размера файла (в байтах) начинать multipart upload
+
 multisegment_threshold - после какого размера файла (в байтах) будет multisegment download
+
+query_string_authentication_host_replace - протокол-хост на который заменять URL в query_string_authentication_uri
+должен начинаться с протокола (http/https), затем хост, на конце может быть, а может не быть слэша.
+нужен если вы хотите сменить хост для отдачи клиентам (у вас кластер) или протокол (https внешним клиентам)
 
 =cut
 
@@ -55,9 +67,14 @@ sub new {
     my $self = bless +{}, $class;
     
     # mandatory
-    $self->{$_} = delete $args{$_} // confess "Missing $_" for (qw/protocol host bucket key secret/);
+    $self->{$_} = delete $args{$_} // confess "Missing $_"
+        for (qw/protocol host bucket key secret/);
     # optional
-    $self->{$_} = delete $args{$_} for (qw/driver_name multipart_threshold multisegment_threshold/);
+    for (qw/driver_name multipart_threshold multisegment_threshold query_string_authentication_host_replace/) {
+        if (defined(my $val = delete $args{$_})) {
+            $self->{$_} = $val;
+        }
+    }
     
     confess "Unused arguments: @{[ %args]}" if %args;
     
@@ -320,6 +337,32 @@ sub delete {
     _check_ascii_key($key);
     
     $self->{driver}->delete($key); 
+}
+
+=head2 query_string_authentication_uri
+
+Возвращает Query String Authentication URL для ключа $key, с экспайром $expires
+
+$expires - epoch время. но низкоуровневая библиотека может принимать другие форматы. убедитесь
+что входные данные валидированы и вы передаёте именно epoch
+
+Заменяет хост, если есть опция query_string_authentication_host_replace (см. конструктор)
+
+=cut
+
+sub query_string_authentication_uri {
+    my ($self, $key, $expires) = @_;
+    
+    _check_ascii_key($key);
+    $expires or confess "Missing expires";
+    
+    my $uri = $self->{driver}->query_string_authentication_uri($key, $expires); 
+    if ($self->{query_string_authentication_host_replace}) {
+        my $replace = $self->{query_string_authentication_host_replace};
+        $replace .= '/' unless $replace =~ m!/$!;
+        $uri =~ s!^https?://[^/]+/!$replace!;
+    }
+    $uri;
 }
 
 1;
