@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-Reg::CEPH
+WebService::CEPH
 
 =head1 DESCRIPTION
 
@@ -14,14 +14,14 @@ Reg::CEPH
 
 =cut
 
-package Reg::CEPH;
+package WebService::CEPH;
 
 # VERSION
 
 use strict;
 use warnings;
 use Carp;
-use Reg::CEPH::NetAmazonS3;
+use WebService::CEPH::NetAmazonS3;
 use Digest::MD5 qw/md5_hex/;
 use Fcntl qw/:seek/;
 

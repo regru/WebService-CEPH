@@ -8,7 +8,7 @@ use HTTP::Daemon;
 use IO::Handle;
 use LWP::UserAgent;
 use Digest::MD5 qw/md5_hex/;
-use Reg::CEPH::NetAmazonS3;
+use WebService::CEPH::NetAmazonS3;
 use POSIX ":sys_wait_h";
 use Test::More;
 
@@ -307,7 +307,7 @@ else { # parent
     my $base = $1;
     print "# HOST/PORT $base\n";
     for (@parent_cb) {
-        my $ceph = Reg::CEPH::NetAmazonS3->new(
+        my $ceph = WebService::CEPH::NetAmazonS3->new(
             protocol => 'http',
             host => $base, # documented as host, but accepts host:port
             bucket => 'testbucket',

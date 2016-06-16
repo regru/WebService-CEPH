@@ -1,6 +1,6 @@
 =encoding utf8
 
-=head1 Reg::CEPH::NetAmazonS3
+=head1 WebService::CEPH::NetAmazonS3
 
 Драйвер для CEPH на базе Net::Amazon::S3.
 
@@ -17,12 +17,12 @@
 модуль, затем обновили Net::Amazon::S3 на новую, ещё не существующую версию, которая
 сломала обратную совместимость приватных методов.
 
-Интерфейс данного модуля документирован. Придерживайтесь того что документировано, Reg::CEPH
+Интерфейс данного модуля документирован. Придерживайтесь того что документировано, WebService::CEPH
 на всё это рассчитывает. Можете написать свой драйвер с таким же интерфейсом, но с другой реализацией.
 
 =cut
 
-package Reg::CEPH::NetAmazonS3;
+package WebService::CEPH::NetAmazonS3;
 
 # VERSION
 
@@ -199,7 +199,7 @@ sub upload_part {
 
 sub complete_multipart_upload {
     my ($self, $multipart_upload) = @_;
-die;    
+
     $multipart_upload->{object}->complete_multipart_upload(
         upload_id => $multipart_upload->{upload_id},
         etags => $multipart_upload->{etags},

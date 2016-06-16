@@ -1,11 +1,11 @@
 use strict;
 use warnings;
 use Test::Spec;
-use Reg::CEPH;
+use WebService::CEPH;
 use File::Temp qw/tempdir/;
 use Digest::MD5 qw/md5_hex/;
 #
-# Юнит тест с моками, тестирующий Reg::CEPH, проверяет всю логику что есть в коде.
+# Юнит тест с моками, тестирующий WebService::CEPH, проверяет всю логику что есть в коде.
 # Все вызовы "драйвера" мокируются
 #
 
@@ -34,11 +34,11 @@ describe CEPH => sub {
         my $driver = mock();
         
         it "should work" => sub {
-            Reg::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
+            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
             
-            my $ceph = Reg::CEPH->new(@mandatory_params);
+            my $ceph = WebService::CEPH->new(@mandatory_params);
             
-            is ref $ceph, 'Reg::CEPH';
+            is ref $ceph, 'WebService::CEPH';
             cmp_deeply +{%$ceph}, {
                 %mandatory_params_h,
                 driver_name => 'NetAmazonS3',
@@ -52,43 +52,43 @@ describe CEPH => sub {
             it "should confess if param $param is missing" => sub {
                 my %params = %mandatory_params_h;
                 delete $params{$param};
-                ok ! eval { Reg::CEPH->new(%params); 1 };
+                ok ! eval { WebService::CEPH->new(%params); 1 };
                 like "$@", qr/Missing $param/;
             };
         }
 
         it "should override driver" => sub {
-            Reg::CEPH::XXX->expects('new')->with(@mandatory_params)->returns($driver);
+            WebService::CEPH::XXX->expects('new')->with(@mandatory_params)->returns($driver);
             
-            my $ceph = Reg::CEPH->new(@mandatory_params, driver_name => 'XXX');
+            my $ceph = WebService::CEPH->new(@mandatory_params, driver_name => 'XXX');
             is $ceph->{driver_name}, 'XXX';
         };
 
         it "should override multipart threshold" => sub {
             my $new_threshold = 10_000_000;
-            Reg::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
+            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
             
-            my $ceph = Reg::CEPH->new(@mandatory_params, multipart_threshold => $new_threshold);
+            my $ceph = WebService::CEPH->new(@mandatory_params, multipart_threshold => $new_threshold);
             
             is $ceph->{multipart_threshold}, $new_threshold;
         };
 
         it "should override multisegment threshold" => sub {
             my $new_threshold = 10_000_000;
-            Reg::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
+            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
             
-            my $ceph = Reg::CEPH->new(@mandatory_params,multisegment_threshold => $new_threshold);
+            my $ceph = WebService::CEPH->new(@mandatory_params,multisegment_threshold => $new_threshold);
             
             is $ceph->{multisegment_threshold}, $new_threshold;
         };
 
         it "should cath bad threshold" => sub {
-            ok ! eval { Reg::CEPH->new(@mandatory_params, multipart_threshold => 5*1024*1024-1); 1 };
+            ok ! eval { WebService::CEPH->new(@mandatory_params, multipart_threshold => 5*1024*1024-1); 1 };
             like "$@", qr/should be greater or eq.*MINIMAL_MULTIPART_PART/;
         };
 
         it "should catch extra args" => sub {
-            ok ! eval { Reg::CEPH->new(@mandatory_params, abc => 42); 1; };
+            ok ! eval { WebService::CEPH->new(@mandatory_params, abc => 42); 1; };
             like "$@", qr/Unused arguments/;
             like "$@", qr/abc.*42/;
         };
@@ -96,7 +96,7 @@ describe CEPH => sub {
     
     describe "other methods" => sub {
         my $driver = mock();
-        my $ceph = bless +{ driver => $driver }, 'Reg::CEPH';
+        my $ceph = bless +{ driver => $driver }, 'WebService::CEPH';
         it "should return size" => sub {
             $driver->expects('size')->with('testkey')->returns(42);
             is $ceph->size('testkey'), 42;
@@ -120,7 +120,7 @@ describe CEPH => sub {
         
         before each => sub {
             $driver = mock();
-            $ceph = bless +{ driver => $driver, multipart_threshold => 2 }, 'Reg::CEPH';
+            $ceph = bless +{ driver => $driver, multipart_threshold => 2 }, 'WebService::CEPH';
             $multipart_data = mock();
             $key = 'mykey';
         };
@@ -170,7 +170,7 @@ describe CEPH => sub {
         
         before each => sub {
             $driver = mock();
-            $ceph = bless +{ driver => $driver, multipart_threshold => 2 }, 'Reg::CEPH';
+            $ceph = bless +{ driver => $driver, multipart_threshold => 2 }, 'WebService::CEPH';
             $multipart_data = mock();
             $key = 'mykey';
         };
@@ -237,7 +237,7 @@ describe CEPH => sub {
         
         before each => sub {
             $driver = mock();
-            $ceph = bless +{ driver => $driver, multisegment_threshold => 2 }, 'Reg::CEPH';
+            $ceph = bless +{ driver => $driver, multisegment_threshold => 2 }, 'WebService::CEPH';
             $key = 'mykey';
         };
         
@@ -320,7 +320,7 @@ describe CEPH => sub {
         
         before each => sub {
             $driver = mock();
-            $ceph = bless +{ driver => $driver, multisegment_threshold => 2 }, 'Reg::CEPH';
+            $ceph = bless +{ driver => $driver, multisegment_threshold => 2 }, 'WebService::CEPH';
             $key = 'mykey';
         };
         
