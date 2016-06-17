@@ -4,6 +4,8 @@ use Test::Spec;
 use WebService::CEPH;
 use File::Temp qw/tempdir/;
 use Digest::MD5 qw/md5_hex/;
+use File::Slurp qw/read_file/;
+
 #
 # Юнит тест с моками, тестирующий WebService::CEPH, проверяет всю логику что есть в коде.
 # Все вызовы "драйвера" мокируются
@@ -341,11 +343,7 @@ describe CEPH => sub {
                 });
                 my $data = join('', @$partsdata);
                 is $ceph->download_to_file($key, $datafile), length $data;
-                open my $f, "<", $datafile;
-                binmode $f;
-                my @data_a = <$f>;
-                my $data_s = join('', @data_a);
-                is $data_s, $data;
+                is read_file($datafile), $data;
             };
         }
         it "multisegment download should work for filehanlde" => sub {
@@ -361,11 +359,7 @@ describe CEPH => sub {
             });
             is $ceph->download_to_file($key, $fh), 2;
             close $fh;
-            open my $f, "<", $datafile;
-            binmode $f;
-            my @data_a = <$f>;
-            my $data_s = join('', @data_a);
-            is $data_s, "Hey\nAb";
+            is read_file($datafile), "Hey\nAb";
         };
 
         it "download to file should return undef when object not exists" => sub {
