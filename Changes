@@ -1,0 +1,8 @@
+0.004     2016-06-17
+          download_to_file now truncates file
+
+0.003     2016-06-16
+          query_string_authentication_uri implemented
+
+0.002     2016-06-15
+          Initial release

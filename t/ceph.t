@@ -352,14 +352,16 @@ describe CEPH => sub {
             my $md5 = md5_hex('Ab');
             my $expect_offset = 0;
             open my $fh, ">", $datafile;
-            print $fh "Hey\n";
+            my $test_string = "Hey\n";
+            print $fh $test_string; # it will seek to beginning anyway
+            ok length($test_string) > length($data); # so we test that file truncated
             $driver->expects('download_with_range')->returns(sub{
                 my ($self, $key, $first, $last) = @_;
-                return (\"Ab", 0, $md5, $md5);
+                return (\$data, 0, $md5, $md5);
             });
             is $ceph->download_to_file($key, $fh), 2;
             close $fh;
-            is read_file($datafile), "Hey\nAb";
+            is read_file($datafile), "Ab";
         };
 
         it "download to file should return undef when object not exists" => sub {

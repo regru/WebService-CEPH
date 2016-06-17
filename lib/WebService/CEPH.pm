@@ -128,7 +128,6 @@ sub upload_from_file {
     my ($self, $key, $fh_or_filename) = @_;
     my $fh = do {
         if (ref $fh_or_filename) {
-            seek($fh_or_filename, 0, SEEK_SET);
             $fh_or_filename
         }
         else {
@@ -220,7 +219,7 @@ sub download {
 Иначе возвращает размер записанных данных.
 
 Выходной файл открывается в режиме перезаписи, если это имя файла, если это filehandle,
-это может быть append-only файл или пайпа.
+то образается на нулевую длину и пишется с начала.
 
 Если размер объекта по факту окажется больше multisegment_threshold,
 объект будет скачан несколькими запросами с заголовком Range (т.е. multi segment download).
@@ -232,6 +231,8 @@ sub download_to_file {
     
     my $fh = do {
         if (ref $fh_or_filename) {
+            seek($fh_or_filename, SEEK_SET, 0);
+            truncate($fh_or_filename, 0);
             $fh_or_filename
         }
         else {
