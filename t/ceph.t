@@ -353,17 +353,21 @@ describe CEPH => sub {
             my $data = "Ab";
             my $md5 = md5_hex('Ab');
             my $expect_offset = 0;
+            open my $fh, ">", $datafile;
+            print $fh "Hey\n";
             $driver->expects('download_with_range')->returns(sub{
                 my ($self, $key, $first, $last) = @_;
                 return (\"Ab", 0, $md5, $md5);
             });
-            is $ceph->download_to_file($key, $datafile), 2;
+            is $ceph->download_to_file($key, $fh), 2;
+            close $fh;
             open my $f, "<", $datafile;
             binmode $f;
             my @data_a = <$f>;
             my $data_s = join('', @data_a);
-            is $data_s, 'Ab';
+            is $data_s, "Hey\nAb";
         };
+
         it "download to file should return undef when object not exists" => sub {
             $driver->expects('download_with_range')->exactly(1)->returns(sub{
                 return;
