@@ -34,12 +34,12 @@ describe CEPH => sub {
         );
         my %mandatory_params_h = @mandatory_params;
         my $driver = mock();
-        
+
         it "should work" => sub {
             WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
-            
+
             my $ceph = WebService::CEPH->new(@mandatory_params);
-            
+
             is ref $ceph, 'WebService::CEPH';
             cmp_deeply +{%$ceph}, {
                 %mandatory_params_h,
@@ -61,7 +61,7 @@ describe CEPH => sub {
 
         it "should override driver" => sub {
             WebService::CEPH::XXX->expects('new')->with(@mandatory_params)->returns($driver);
-            
+
             my $ceph = WebService::CEPH->new(@mandatory_params, driver_name => 'XXX');
             is $ceph->{driver_name}, 'XXX';
         };
@@ -69,18 +69,18 @@ describe CEPH => sub {
         it "should override multipart threshold" => sub {
             my $new_threshold = 10_000_000;
             WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
-            
+
             my $ceph = WebService::CEPH->new(@mandatory_params, multipart_threshold => $new_threshold);
-            
+
             is $ceph->{multipart_threshold}, $new_threshold;
         };
 
         it "should override multisegment threshold" => sub {
             my $new_threshold = 10_000_000;
             WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
-            
+
             my $ceph = WebService::CEPH->new(@mandatory_params,multisegment_threshold => $new_threshold);
-            
+
             is $ceph->{multisegment_threshold}, $new_threshold;
         };
 
@@ -95,7 +95,7 @@ describe CEPH => sub {
             like "$@", qr/abc.*42/;
         };
     };
-    
+
     describe "other methods" => sub {
         my $driver = mock();
         my $ceph = bless +{ driver => $driver }, 'WebService::CEPH';
@@ -119,14 +119,14 @@ describe CEPH => sub {
     };
     describe upload => sub {
         my ($driver, $ceph, $multipart_data, $key);
-        
+
         before each => sub {
             $driver = mock();
             $ceph = bless +{ driver => $driver, multipart_threshold => 2 }, 'WebService::CEPH';
             $multipart_data = mock();
             $key = 'mykey';
         };
-        
+
         for my $partsdata ([qw/Aa B/], [qw/Aa Bb/], [qw/Aa Bb C/]) {
             it "multipart upload should work for @$partsdata" => sub {
                 my $data_s = join('', @$partsdata);
@@ -169,19 +169,19 @@ describe CEPH => sub {
     };
     describe upload_from_file => sub {
         my ($driver, $ceph, $multipart_data, $key);
-        
+
         before each => sub {
             $driver = mock();
             $ceph = bless +{ driver => $driver, multipart_threshold => 2 }, 'WebService::CEPH';
             $multipart_data = mock();
             $key = 'mykey';
         };
-        
+
         for my $partsdata ([qw/Aa B/], [qw/Aa Bb/], [qw/Aa Bb C/]) {
             it "multipart upload should work for @$partsdata" => sub {
                 my $data_s = join('', @$partsdata);
                 my $datafile = create_temp_file($data_s);
-                
+
                 $driver->expects('initiate_multipart_upload')->with($key, md5_hex($data_s))->returns($multipart_data);
                 my (@parts, @data);
                 $driver->expects('upload_part')->exactly(scalar @$partsdata)->returns(sub{
@@ -196,12 +196,12 @@ describe CEPH => sub {
                 cmp_deeply [@data], $partsdata;
             };
         };
-        
+
         it "multipart upload should work for filehandle" => sub {
             my $data_s = "Hello";
             my $datafile = create_temp_file($data_s);
             open my $f, "<", $datafile or die "$!";
-            
+
             $driver->expects('initiate_multipart_upload')->with($key, md5_hex('Hello'))->returns($multipart_data);
             my (@parts, @data);
             $driver->expects('upload_part')->exactly(3)->returns(sub{
@@ -219,7 +219,7 @@ describe CEPH => sub {
         it "non-multipart upload should work for filehandle" => sub {
             my $data_s = "Ab";
             my $datafile = create_temp_file($data_s);
-           
+
             open my $f, "<", $datafile or die "$!";
 
             $driver->expects('upload_single_request')->with($key, 'Ab');
@@ -229,20 +229,20 @@ describe CEPH => sub {
         it "non-multipart upload should work for file" => sub {
             my $data_s = "Ab";
             my $datafile = create_temp_file($data_s);
-            
+
             $driver->expects('upload_single_request')->with($key, 'Ab');
             $ceph->upload_from_file($key, $datafile);
         };
     };
     describe download => sub {
         my ($driver, $ceph, $key);
-        
+
         before each => sub {
             $driver = mock();
             $ceph = bless +{ driver => $driver, multisegment_threshold => 2 }, 'WebService::CEPH';
             $key = 'mykey';
         };
-        
+
         for my $partsdata ([qw/A/], [qw/Aa/], [qw/Aa B/], [qw/Aa Bb/], [qw/Aa Bb C/]) {
             it "multisegment download should work for @$partsdata" => sub {
                 my @parts = @$partsdata;
@@ -259,7 +259,7 @@ describe CEPH => sub {
                 is $ceph->download($key), join('', @$partsdata);
             };
         }
-        
+
         it "multisegment download should crash on wrong etags" => sub {
             $driver->expects('download_with_range')->exactly(1)->returns(sub{
                 return (\"Test", 0, "696df35ad1161afbeb6ea667e5dd5dab")
@@ -319,17 +319,17 @@ describe CEPH => sub {
     };
     describe download_to_file => sub {
         my ($driver, $ceph, $key);
-        
+
         before each => sub {
             $driver = mock();
             $ceph = bless +{ driver => $driver, multisegment_threshold => 2 }, 'WebService::CEPH';
             $key = 'mykey';
         };
-        
+
         for my $partsdata ([qw/A/], [qw/Aa/], [qw/Aa B/], [qw/Aa Bb/], [qw/Aa Bb C/]) {
             it "multisegment download should work for @$partsdata" => sub {
                 my $datafile = "$tmp_dir/datafile";
-                
+
                 my @parts = @$partsdata;
                 my $md5 = md5_hex(join('', @parts));
                 my $expect_offset = 0;

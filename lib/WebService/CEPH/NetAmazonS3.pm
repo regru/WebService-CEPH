@@ -51,14 +51,14 @@ secret - секретный секрет
 
 sub new {
     my ($class, %args) = @_;
-    
+
     my $self = bless +{}, $class;
 
     $self->{$_} = delete $args{$_} // confess "Missing $_" for (qw/protocol host bucket key secret/);
 
     confess "Unused arguments %args" if %args;
     confess "protocol should be 'http' or 'https'" unless $self->{protocol} =~ /^https?$/;
-    
+
     my $s3 = Net::Amazon::S3->new({
         aws_access_key_id     => $self->{key},
         aws_secret_access_key => $self->{secret}, # TODO: фильтровать в логировании?
@@ -66,7 +66,7 @@ sub new {
         secure                => $self->{protocol} eq 'https',
         retry                 => 1,
     });
-    
+
     $self->{client} =  Net::Amazon::S3::Client->new( s3 => $s3 );
     $self;
 }
@@ -80,7 +80,7 @@ sub new {
 
 sub _request_object {
     my ($self) = @_;
-    
+
     $self->{client}->bucket(name => $self->{bucket});
 }
 
@@ -134,19 +134,19 @@ sub initiate_multipart_upload {
     my ($self, $key, $md5) = @_;
 
     my $object = $self->_request_object->object( key => $key, acl_short => 'private' );
-    
+
     my $http_request = Net::Amazon::S3::Request::InitiateMultipartUpload->new(
         s3     => $self->{client}->s3,
         bucket => $self->{bucket},
         key    => $key,
         headers => +{ 'X-Amz-Meta-Md5' => $md5 }
     )->http_request;
-    
+
     my $xpc = $self->{client}->_send_request_xpc($http_request);
     my $upload_id = $xpc->findvalue('//s3:UploadId');
     confess "Couldn't get upload id from initiate_multipart_upload response XML"
       unless $upload_id;
-    
+
     +{ key => $key, upload_id => $upload_id, object => $object, md5 => $md5};
 }
 
@@ -172,14 +172,14 @@ sub initiate_multipart_upload {
 
 sub upload_part {
     my ($self, $multipart_upload, $part_number) = (shift, shift, shift);
-    
+
     $multipart_upload->{object}->put_part(
         upload_id => $multipart_upload->{upload_id},
         part_number => $part_number,
         value => $_[0]
     );
-    
-    # TODO:Part numbers should be in accessing order (in case someone uploads in parallel) ! 
+
+    # TODO:Part numbers should be in accessing order (in case someone uploads in parallel) !
     push @{$multipart_upload->{parts} ||= [] }, $part_number;
     push @{$multipart_upload->{etags} ||= [] }, md5_hex($_[0]);
 }
@@ -240,8 +240,8 @@ sub complete_multipart_upload {
 
 sub download_with_range {
     my ($self, $key, $first, $last) = @_;
-    
-    
+
+
     # TODO: How and when to validate ETag here?
     my $http_request = Net::Amazon::S3::Request::GetObject->new(
         s3     => $self->{client}->s3,
@@ -249,12 +249,12 @@ sub download_with_range {
         key    => $key,
         method => 'GET',
     )->http_request;
-    
+
     if (defined $first) {
         $last //= '';
         $http_request->headers->header("Range", "bytes=$first-$last");
     }
-    
+
     my $http_response = $self->{client}->_send_request_raw($http_request);
     #print $http_request->as_string, $http_response->as_string ;
     if ( $http_response->code == 404 && $http_response->decoded_content =~ m!<Code>NoSuchKey</Code>!) {
@@ -271,15 +271,15 @@ sub download_with_range {
             my ($f, $l, $total) = $range =~ m!bytes (\d+)\-(\d+)/(\d+)! or confess;
             $left = $total - ( $l + 1);
         }
-        
+
         my $etag = $http_response->header('ETag');
         if ($etag) {
             $etag =~ s/^"//;
             $etag =~ s/"$//;
         }
-        
+
         my $custom_md5 = $http_response->header('X-Amz-Meta-Md5');
-        
+
         return (\$http_response->decoded_content, $left, $etag, $custom_md5);
     }
 }
@@ -301,14 +301,14 @@ sub download_with_range {
 
 sub size {
     my ($self, $key) = @_;
-    
+
     my $http_request = Net::Amazon::S3::Request::GetObject->new(
         s3     => $self->{client}->s3,
         bucket => $self->{bucket},
         key    => $key,
         method => 'HEAD',
     )->http_request;
-    
+
     my $http_response = $self->{client}->_send_request_raw($http_request);
     if ( $http_response->code == 404) { # It's not possible to distinct between NoSuchkey and NoSuchBucket??
         return undef;
@@ -319,9 +319,9 @@ sub size {
     else {
         return $http_response->header('Content-Length');
     }
-    
-    
-    
+
+
+
 }
 
 =head2 delete
@@ -340,7 +340,7 @@ sub size {
 
 sub delete {
     my ($self, $key) = @_;
-    
+
     $self->_request_object->object( key => $key )->delete;
 }
 
@@ -352,7 +352,7 @@ sub delete {
 
 sub query_string_authentication_uri {
     my ($self, $key, $expires) = @_;
-    
+
     $self->_request_object->object( key => $key, expires => $expires )->query_string_authentication_uri;
 }
 

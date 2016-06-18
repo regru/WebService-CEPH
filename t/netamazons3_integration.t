@@ -1,7 +1,5 @@
-
 use strict;
 use warnings;
-
 
 use Test::Deep;
 use HTTP::Daemon;
@@ -16,7 +14,7 @@ our (@child_cb, @parent_cb, @messages_client, @messages_server);
 
 sub test_case {
     my ($msg, $client, @servers) = @_;
-    
+
     push @messages_client, $msg;
     push @messages_server, ($msg) x @servers;
     push @child_cb, @servers;
@@ -33,7 +31,7 @@ test_case "Upload single request" => sub {
     my ($msg, $ceph) = @_;
     $ceph->upload_single_request('my key', 'myvalue');
     ok 1, "$msg"
-    
+
 } => sub {
     my ($msg, $connect, $request) = @_;
     die unless $request->url eq '/testbucket/my%20key';
@@ -50,7 +48,7 @@ test_case "Work with plus in URL" => sub {
     my ($msg, $ceph) = @_;
     $ceph->upload_single_request('my+key', 'myvalue');
     ok 1, "$msg"
-    
+
 } => sub {
     my ($msg, $connect, $request) = @_;
     die unless $request->url eq '/testbucket/my%2Bkey';
@@ -63,7 +61,7 @@ test_case "Upload zero-size file" => sub {
     my ($msg, $ceph) = @_;
     $ceph->upload_single_request('mykey', '');
     ok 1, "$msg"
-    
+
 } => sub {
     my ($msg, $connect, $request) = @_;
     die unless $request->url eq '/testbucket/mykey';
@@ -76,7 +74,7 @@ test_case "Upload single request with broken md5" => sub {
     my ($msg, $ceph) = @_;
     ok ! eval { $ceph->upload_single_request('mykey', 'myvalue'); 1 }, $msg;
     like "$@", qr/^Corrupted upload/, $msg;
-    
+
 } => sub {
     my ($msg, $connect, $request) = @_;
     my $resp = HTTP::Response->new(200, 'OK');
@@ -104,7 +102,7 @@ test_case "Multipart upload" => sub {
     <UploadId>VXBsb2FkIElEIGZvciA2aWWpbmcncyBteS1tb3ZpZS5tMnRzIHVwbG9hZA</UploadId>
 </InitiateMultipartUploadResult>
 XML
-    
+
     $connect->send_response($resp);
 } => sub {
     my ($msg, $connect, $request) = @_;
@@ -136,7 +134,7 @@ test_case "Download single request" => sub {
     my ($msg, $ceph) = @_;
     my ($dataref, $left, $etag, $custom_md5) = $ceph->download_with_range('mykey');
     is $$dataref, "HeyThere", $msg
-    
+
 } => sub {
     my ($msg, $connect, $request) = @_;
     die unless $request->url eq '/testbucket/mykey';
@@ -291,7 +289,7 @@ test_case "Delete object" => sub {
     like
         $ceph->query_string_authentication_uri('mykey', $expires),
         qr!http://example.com/testbucket/mykey\?AWSAccessKeyId=abc\&Expires=${expires}\&Signature=!;
-    
+
 }
 
 #

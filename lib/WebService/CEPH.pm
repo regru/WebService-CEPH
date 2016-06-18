@@ -63,9 +63,9 @@ query_string_authentication_host_replace - протокол-хост на кот
 
 sub new {
     my ($class, %args) = @_;
-    
+
     my $self = bless +{}, $class;
-    
+
     # mandatory
     $self->{$_} = delete $args{$_} // confess "Missing $_"
         for (qw/protocol host bucket key secret/);
@@ -75,19 +75,19 @@ sub new {
             $self->{$_} = $val;
         }
     }
-    
+
     confess "Unused arguments: @{[ %args]}" if %args;
-    
+
     $self->{driver_name} ||= "NetAmazonS3";
     $self->{multipart_threshold} ||= MINIMAL_MULTIPART_PART;
     $self->{multisegment_threshold}  ||= MINIMAL_MULTIPART_PART;
-            
+
     confess "multipart_threshold should be greater or eq. MINIMAL_MULTIPART_PART (5Mb) (now multipart_threshold=$self->{multipart_threshold}"
         if $self->{multipart_threshold} < MINIMAL_MULTIPART_PART;
-    
+
     my $driver_class = __PACKAGE__."::".$self->{driver_name}; # should be loaded via "use" at top of file
     $self->{driver} = $driver_class->new(map { $_ => $self->{$_} } qw/protocol host bucket key secret/ );
-    
+
     $self;
 }
 
@@ -136,11 +136,11 @@ sub upload_from_file {
             $f;
         }
     };
-    
+
     my $md5 = Digest::MD5->new;
     $md5->addfile($fh);
     seek($fh, 0, SEEK_SET);
-    
+
     $self->_upload($key, sub { read($_[0], my $data, $_[2]) // confess "Error reading data $!\n"; $data }, -s $fh, $md5->hexdigest, $fh);
 }
 
@@ -169,13 +169,13 @@ sub upload_from_file {
 sub _upload {
     # after that $_[0] is data (scalar or filehandle)
     my ($self, $key, $iterator, $length, $md5_hex) = (shift, shift, shift, shift, shift);
-    
+
     _check_ascii_key($key);
 
     if ($length > $self->{multipart_threshold}) {
-        
+
         my $multipart = $self->{driver}->initiate_multipart_upload($key, $md5_hex);
-        
+
         my $len = $length;
         my $offset = 0;
         my $part = 0;
@@ -183,7 +183,7 @@ sub _upload {
             my $chunk = $iterator->($_[0], $offset, $self->{multipart_threshold});
 
             $self->{driver}->upload_part($multipart, ++$part, $chunk);
-            
+
             $offset += $self->{multipart_threshold};
         }
         $self->{driver}->complete_multipart_upload($multipart);
@@ -191,8 +191,8 @@ sub _upload {
     else {
         $self->{driver}->upload_single_request($key, $iterator->($_[0], 0, $length));
     }
- 
-    return;   
+
+    return;
 }
 
 =head2 download
@@ -228,7 +228,7 @@ sub download {
 
 sub download_to_file {
     my ($self, $key, $fh_or_filename) = @_;
-    
+
     my $fh = do {
         if (ref $fh_or_filename) {
             seek($fh_or_filename, SEEK_SET, 0);
@@ -241,7 +241,7 @@ sub download_to_file {
             $f;
         }
     };
-    
+
     my $size = 0;
     _download($self, $key, sub {
         $size += length($_[0]);
@@ -267,9 +267,9 @@ sub download_to_file {
 
 sub _download {
     my ($self, $key, $appender) = @_;
-    
+
     _check_ascii_key($key);
-    
+
     my $offset = 0;
     my $check_md5 = undef;
     my $md5 =  Digest::MD5->new;
@@ -284,7 +284,7 @@ sub _download {
         # Проверяем md5 только если ETag "нормальный" с md5 (был не multipart upload)
         if (!defined $check_md5) {
             my ($etag_md5) = $etag =~ /^([0-9a-f]+)$/;
-            
+
             confess "ETag looks like valid md5 and x-amz-meta-md5 presents but they do not match"
                 if ($etag_md5 && $custom_md5 && $etag_md5 ne $custom_md5);
             if ($etag_md5) {
@@ -298,7 +298,7 @@ sub _download {
         if ($check_md5) {
             $md5->add($$dataref);
         }
-        
+
         $offset += length($$dataref);
         $appender->($$dataref);
         last unless $bytesleft;
@@ -319,10 +319,10 @@ sub _download {
 
 sub size {
     my ($self, $key) = @_;
-    
+
     _check_ascii_key($key);
-    
-    $self->{driver}->size($key); 
+
+    $self->{driver}->size($key);
 }
 
 =head2 delete
@@ -334,10 +334,10 @@ sub size {
 
 sub delete {
     my ($self, $key) = @_;
-    
+
     _check_ascii_key($key);
-    
-    $self->{driver}->delete($key); 
+
+    $self->{driver}->delete($key);
 }
 
 =head2 query_string_authentication_uri
@@ -353,11 +353,11 @@ $expires - epoch время. но низкоуровневая библиоте�
 
 sub query_string_authentication_uri {
     my ($self, $key, $expires) = @_;
-    
+
     _check_ascii_key($key);
     $expires or confess "Missing expires";
-    
-    my $uri = $self->{driver}->query_string_authentication_uri($key, $expires); 
+
+    my $uri = $self->{driver}->query_string_authentication_uri($key, $expires);
     if ($self->{query_string_authentication_host_replace}) {
         my $replace = $self->{query_string_authentication_host_replace};
         $replace .= '/' unless $replace =~ m!/$!;
