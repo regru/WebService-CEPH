@@ -96,6 +96,7 @@ sub _request_object {
 
 3) сами данные (блоб)
 
+4) Content-Type, не обязателен
 
 Закачивает объект за один запрос (не-multipart upload), ставит приватный ACL,
 добавляет кастомный заголовок x-amz-meta-md5, который равен md5 hex от файла
@@ -103,10 +104,14 @@ sub _request_object {
 =cut
 
 sub upload_single_request {
-    my ($self, $key) = (shift, shift);
+    my ($self, $key) = (shift, shift); # after shifts: $_[0] - value, $_[1] - content-type
 
     my $md5 = md5_hex($_[0]);
-    my $object = $self->_request_object->object( key => $key, acl_short => 'private' );
+    my $object = $self->_request_object->object(
+        key => $key,
+        acl_short => 'private',
+        $_[1] ? ( content_type => $_[1] ) : ()
+    );
     $object->user_metadata->{'md5'} = $md5;
     $object->_put($_[0], length($_[0]), $md5); # private _put so we can re-use md5. only for that.
 }
@@ -131,7 +136,7 @@ sub upload_single_request {
 =cut
 
 sub initiate_multipart_upload {
-    my ($self, $key, $md5) = @_;
+    my ($self, $key, $md5, $content_type) = @_;
 
     my $object = $self->_request_object->object( key => $key, acl_short => 'private' );
 
@@ -139,7 +144,10 @@ sub initiate_multipart_upload {
         s3     => $self->{client}->s3,
         bucket => $self->{bucket},
         key    => $key,
-        headers => +{ 'X-Amz-Meta-Md5' => $md5 }
+        headers => +{
+            'X-Amz-Meta-Md5' => $md5,
+            $content_type ? ( 'Content-type' => $content_type ) : ()
+        }
     )->http_request;
 
     my $xpc = $self->{client}->_send_request_xpc($http_request);

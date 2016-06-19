@@ -106,12 +106,13 @@ sub new {
 0-й - $self
 1-й - имя ключа
 2-й - скаляр, данные ключа
+3-й - Content-type. Если undef, используется дефолтный binary/octet-stream
 
 =cut
 
 sub upload {
-    my ($self, $key) = (shift, shift);
-    $self->_upload($key, sub { substr($_[0], $_[1], $_[2]) }, length($_[0]), md5_hex($_[0]), $_[0]);
+    my ($self, $key) = (shift, shift); # после этого $_[0] - данные, $_[1] - Content-type
+    $self->_upload($key, sub { substr($_[0], $_[1], $_[2]) }, length($_[0]), md5_hex($_[0]), $_[1], $_[0]);
 }
 
 =head2 upload_from_file
@@ -121,13 +122,14 @@ sub upload {
 0-й - $self
 1-й - имя ключа
 2-й - имя файла (если скаляр), иначе открытый filehandle
+3-й - Content-type. Если undef, используется дефолтный binary/octet-stream
 
 Дваждый проходит по файлу, высчитывая md5. Файл не должен быть пайпом, его размер не должен меняться.
 
 =cut
 
 sub upload_from_file {
-    my ($self, $key, $fh_or_filename) = @_;
+    my ($self, $key, $fh_or_filename, $content_type) = @_;
     my $fh = do {
         if (ref $fh_or_filename) {
             $fh_or_filename
@@ -143,7 +145,11 @@ sub upload_from_file {
     $md5->addfile($fh);
     seek($fh, 0, SEEK_SET);
 
-    $self->_upload($key, sub { read($_[0], my $data, $_[2]) // confess "Error reading data $!\n"; $data }, -s $fh, $md5->hexdigest, $fh);
+    $self->_upload(
+        $key,
+        sub { read($_[0], my $data, $_[2]) // confess "Error reading data $!\n"; $data },
+        -s $fh, $md5->hexdigest, $content_type, $fh
+    );
 }
 
 =head2 _upload
@@ -163,20 +169,21 @@ sub upload_from_file {
 
 5) заранее высчитанный md5 от данных
 
-6) данные. или скаляр. или filehandle
+6) Content-type. Если undef, используется дефолтный binary/octet-stream
+
+7) данные. или скаляр. или filehandle
 
 =cut
 
 
 sub _upload {
     # after that $_[0] is data (scalar or filehandle)
-    my ($self, $key, $iterator, $length, $md5_hex) = (shift, shift, shift, shift, shift);
+    my ($self, $key, $iterator, $length, $md5_hex, $content_type) = (shift, shift, shift, shift, shift, shift);
 
     _check_ascii_key($key);
 
     if ($length > $self->{multipart_threshold}) {
-
-        my $multipart = $self->{driver}->initiate_multipart_upload($key, $md5_hex);
+        my $multipart = $self->{driver}->initiate_multipart_upload($key, $md5_hex, $content_type);
 
         my $len = $length;
         my $offset = 0;
@@ -191,7 +198,7 @@ sub _upload {
         $self->{driver}->complete_multipart_upload($multipart);
     }
     else {
-        $self->{driver}->upload_single_request($key, $iterator->($_[0], 0, $length));
+        $self->{driver}->upload_single_request($key, $iterator->($_[0], 0, $length), $content_type);
     }
 
     return;

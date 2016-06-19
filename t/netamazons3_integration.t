@@ -37,11 +37,30 @@ test_case "Upload single request" => sub {
     die unless $request->url eq '/testbucket/my%20key';
     die unless $request->header('Content-MD5') eq '1ySnE1zn0lk8JfxSEtQSWg==';
     die unless $request->header('X-Amz-Meta-Md5') eq 'd724a7135ce7d2593c25fc5212d4125a';
+    die unless $request->header('Content-type') eq 'binary/octet-stream';
     die unless $request->content eq 'myvalue';
     my $resp = HTTP::Response->new(200, 'OK');
     $resp->header(ETag => md5_hex($request->content));
     $connect->send_response($resp);
 };
+
+test_case "Upload single request" => sub {
+    my ($msg, $ceph) = @_;
+    $ceph->upload_single_request('my key', 'myvalue', 'text/plain');
+    ok 1, "$msg"
+
+} => sub {
+    my ($msg, $connect, $request) = @_;
+    die unless $request->url eq '/testbucket/my%20key';
+    die unless $request->header('Content-MD5') eq '1ySnE1zn0lk8JfxSEtQSWg==';
+    die unless $request->header('X-Amz-Meta-Md5') eq 'd724a7135ce7d2593c25fc5212d4125a';
+    die unless $request->header('Content-type') eq 'text/plain';
+    die unless $request->content eq 'myvalue';
+    my $resp = HTTP::Response->new(200, 'OK');
+    $resp->header(ETag => md5_hex($request->content));
+    $connect->send_response($resp);
+};
+
 
 # https://forums.aws.amazon.com/thread.jspa?threadID=55746
 test_case "Work with plus in URL" => sub {
@@ -93,6 +112,7 @@ test_case "Multipart upload" => sub {
 } => sub {
     my ($msg, $connect, $request) = @_;
     die "Wrong md5" unless $request->header('X-Amz-Meta-Md5') eq 'somemd5';
+    die $request->header('Content-type') if $request->header('Content-type');
     my $resp = HTTP::Response->new(200, 'OK');
     $resp->content(<<'XML');
 <?xml version="1.0" encoding="UTF-8"?>
@@ -125,6 +145,24 @@ XML
 <Part><PartNumber>2</PartNumber><ETag>5890595e16cbebb8866e1842e4bd6ec7</ETag></Part></CompleteMultipartUpload>\s*
     !x;
     my $resp = HTTP::Response->new(200, 'OK');
+    $connect->send_response($resp);
+};
+
+test_case "Multipart upload should work with Content-type" => sub {
+    my ($msg, $ceph) = @_;
+    my $multipart_data = $ceph->initiate_multipart_upload('mykey', 'somemd5', 'text/plain');
+} => sub {
+    my ($msg, $connect, $request) = @_;
+    die unless $request->header('Content-type') eq 'text/plain';
+    my $resp = HTTP::Response->new(200, 'OK');
+    $resp->content(<<'XML');
+<?xml version="1.0" encoding="UTF-8"?>
+<InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+    <Bucket>testbucket</Bucket>
+    <Key>mykey</Key>
+    <UploadId>VXBsb2FkIElEIGZvciA2aWWpbmcncyBteS1tb3ZpZS5tMnRzIHVwbG9hZA</UploadId>
+</InitiateMultipartUploadResult>
+XML
     $connect->send_response($resp);
 };
 
