@@ -210,8 +210,15 @@ sub _upload {
 sub download {
     my ($self, $key) = @_;
     my $data;
-    _download($self, $key, sub { $data .= $_[0] }) or return;
-    $data;
+    # workaround for CEPH bug http://lists.ceph.com/pipermail/ceph-users-ceph.com/2016-June/010704.html
+    my $cephsize = $self->size($key);
+    if (defined($cephsize) && $cephsize == 0) {
+        return '';
+    } else {
+        # / workaround for CEPH bug
+        _download($self, $key, sub { $data .= $_[0] }) or return;
+        return $data;
+    }
 }
 
 =head2 download_to_file
@@ -244,12 +251,20 @@ sub download_to_file {
         }
     };
 
-    my $size = 0;
-    _download($self, $key, sub {
-        $size += length($_[0]);
-        print $fh $_[0] or confess "Error writing to file $!"
-    }) or return;
-    $size;
+    # workaround for CEPH bug http://lists.ceph.com/pipermail/ceph-users-ceph.com/2016-June/010704.html
+    my $cephsize = $self->size($key);
+    if (defined($cephsize) && $cephsize == 0) {
+        return 0;
+    }
+    else {
+        # / workaround for CEPH bug
+        my $size = 0;
+        _download($self, $key, sub {
+            $size += length($_[0]);
+            print $fh $_[0] or confess "Error writing to file $!"
+        }) or return;
+        return $size;
+    }
 }
 
 =head2 _download

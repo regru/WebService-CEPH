@@ -246,6 +246,9 @@ describe CEPH => sub {
         before each => sub {
             $driver = mock();
             $ceph = bless +{ driver => $driver, multisegment_threshold => 2 }, 'WebService::CEPH';
+            # workaround for CEPH bug http://lists.ceph.com/pipermail/ceph-users-ceph.com/2016-June/010704.html
+            $ceph->expects('size')->returns(1);
+            # /workaround for CEPH bug
             $key = 'mykey';
         };
 
@@ -330,6 +333,9 @@ describe CEPH => sub {
             $driver = mock();
             $ceph = bless +{ driver => $driver, multisegment_threshold => 2 }, 'WebService::CEPH';
             $key = 'mykey';
+            # workaround for CEPH bug http://lists.ceph.com/pipermail/ceph-users-ceph.com/2016-June/010704.html
+            $ceph->expects('size')->returns(1);
+            # /workaround for CEPH bug
         };
 
         for my $partsdata ([qw/A/], [qw/Aa/], [qw/Aa B/], [qw/Aa Bb/], [qw/Aa Bb C/]) {
@@ -377,6 +383,30 @@ describe CEPH => sub {
             ok ! defined $ceph->download_to_file($key, "$tmp_dir/datafile");
         };
     };
+
+    # workaround for CEPH bug http://lists.ceph.com/pipermail/ceph-users-ceph.com/2016-June/010704.html
+    describe "Download of zero size files" => sub {
+        my ($driver, $ceph, $key, $datafile);
+        before each => sub {
+            $datafile = "$tmp_dir/datafile";
+            $driver = mock();
+            $ceph = bless +{ driver => $driver, multisegment_threshold => 2 }, 'WebService::CEPH';
+            $ceph->expects('size')->returns(0);
+            $key = 'mykey';
+        };
+
+        it "should work for download" => sub {
+            is $ceph->download($key), '';
+        };
+        it "should work for download_to_file" => sub {
+            is $ceph->download_to_file($key, $datafile), 0;
+            ok -f $datafile;
+            ok !-s $datafile;
+        };
+
+    };
+    # /workaround for CEPH bug
+
     describe query_string_authentication_uri => sub {
         my ($driver, $ceph);
         before each => sub {
