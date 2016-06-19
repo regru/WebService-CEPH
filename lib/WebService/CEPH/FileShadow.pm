@@ -6,7 +6,7 @@ package WebService::CEPH::FileShadow;
 
 Потомок WebService::CEPH.
 
-Опции конструктора те же самые, плюс ещё есть:
+Опции конструктора те же самые, что и у WebService::CEPH, плюс ещё есть:
 
 mode - 's3' или 's3-fs' или 'fs'
 
@@ -42,9 +42,12 @@ sub new {
 
     $new_options{$_} = delete $options{$_} for (qw/fs_shadow_path mode/);
 
-    m!/$! or $_ .= '/' for $new_options{fs_shadow_path};
+    !defined or m!/$! or $_ .= '/' for $new_options{fs_shadow_path};
     confess "mode should be 's3', 's3-fs' or 'fs', but it is '$new_options{mode}'"
         unless $new_options{mode} =~ /^(s3|s3\-fs|fs)$/;
+
+    confess "you specified mode to work with filesystem ($new_options{mode}), please define fs_shadow_path then"
+        if $new_options{mode} =~ /fs/ && !$new_options{fs_shadow_path};
 
     my $self = $class->SUPER::new(%options);
 
@@ -143,7 +146,7 @@ sub query_string_authentication_uri {
         $self->SUPER::query_string_authentication_uri($key, $expires);
     }
     else {
-        confess;
+        confess "Unimplemented in fs mode";
     }
 }
 

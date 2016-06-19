@@ -14,26 +14,7 @@ CEPH client for simple workflow, supporting multipart uploads. Most docs are in 
 Обработка ошибок (исключения их тип итп; повторы неудачных запросов) - на совести более низкоуровневой библиотеки,
 если иное не гарантируется в этой документации.
 
-=cut
-
-package WebService::CEPH;
-
-# VERSION
-
-use strict;
-use warnings;
-use Carp;
-use WebService::CEPH::NetAmazonS3;
-use Digest::MD5 qw/md5_hex/;
-use Fcntl qw/:seek/;
-
-use constant MINIMAL_MULTIPART_PART => 5*1024*1024;
-
-sub _check_ascii_key { confess "Key should be ASCII-only" unless $_[0] !~ /[^\x00-\x7f]/ }
-
-=head2 new
-
-Конструктор.
+Параметры конструктора:
 
 Обязательные параметры:
 
@@ -58,6 +39,27 @@ multisegment_threshold - после какого размера файла (в �
 query_string_authentication_host_replace - протокол-хост на который заменять URL в query_string_authentication_uri
 должен начинаться с протокола (http/https), затем хост, на конце может быть, а может не быть слэша.
 нужен если вы хотите сменить хост для отдачи клиентам (у вас кластер) или протокол (https внешним клиентам)
+
+=cut
+
+package WebService::CEPH;
+
+# VERSION
+
+use strict;
+use warnings;
+use Carp;
+use WebService::CEPH::NetAmazonS3;
+use Digest::MD5 qw/md5_hex/;
+use Fcntl qw/:seek/;
+
+use constant MINIMAL_MULTIPART_PART => 5*1024*1024;
+
+sub _check_ascii_key { confess "Key should be ASCII-only" unless $_[0] !~ /[^\x00-\x7f]/ }
+
+=head2 new
+
+Конструктор. Параметры см. выше.
 
 =cut
 

@@ -22,16 +22,34 @@ describe "FS Shadow" => sub {
         my @fs_opts = qw/fs_shadow_path mode/;
         my @all_opts = (@ceph_opts, @fs_opts);
 
-        it "should work" => sub {
-            WebService::CEPH->expects('new')->returns(sub {
-                my ($self, %opts) = @_;
-                cmp_deeply \%opts, +{ map { $_ => $_ } @ceph_opts};
-                return bless \%opts, 'WebService::CEPH';
-            });
-            my $ceph = WebService::CEPH::FileShadow->new(( map { $_ => $_ } @all_opts), mode => 's3-fs' );
-            is $ceph->{'mode'}, 's3-fs';
-            is $ceph->{'fs_shadow_path'}, 'fs_shadow_path/';
+
+        describe "should work" => sub {
+            before each => sub {
+                WebService::CEPH->expects('new')->returns(sub {
+                    my ($self, %opts) = @_;
+                    cmp_deeply \%opts, +{ map { $_ => $_ } @ceph_opts};
+                    return bless \%opts, 'WebService::CEPH';
+                });
+            };
+            it "normaly" => sub {
+                my $ceph = WebService::CEPH::FileShadow->new(( map { $_ => $_ } @all_opts), mode => 's3-fs' );
+                is $ceph->{'mode'}, 's3-fs';
+                is $ceph->{'fs_shadow_path'}, 'fs_shadow_path/';
+            };
+
+            it "without fs_shadow_path in s3 mode" => sub {
+                my $ceph = WebService::CEPH::FileShadow->new(( map { $_ => $_ } @ceph_opts), mode => 's3' );
+                is $ceph->{'mode'}, 's3';
+                ok ! defined $ceph->{'fs_shadow_path'};
+            };
         };
+        for my $mode (qw/s3-fs fs/) {
+            it "should confess without fs_shadow_path in $mode mode" => sub {
+                WebService::CEPH->expects('new')->never;
+                ok ! eval { WebService::CEPH::FileShadow->new(( map { $_ => $_ } @ceph_opts), mode => $mode ); 1 };
+                like "$@", qr/please define fs_shadow_path/;
+            };
+        }
     };
 
     describe "_filepath" => sub {
