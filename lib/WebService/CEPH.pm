@@ -227,7 +227,9 @@ sub download {
 =head2 download_to_file
 
 Скачивает данные объекта с именем $key в файл $fh_or_filename.
-Если объект не существует, возвращает undef (при этом выходной файл всё равно будет испорчен)
+Если объект не существует, возвращает undef (при этом выходной файл всё равно будет испорчен и, возможно,
+частично записан в случае race condition - удаляйте эти данные сами; если удалять тяжело - пользуйтесь
+методом download)
 Иначе возвращает размер записанных данных.
 
 Выходной файл открывается в режиме перезаписи, если это имя файла, если это filehandle,
@@ -296,13 +298,26 @@ sub _download {
     my $offset = 0;
     my $check_md5 = undef;
     my $md5 =  Digest::MD5->new;
+    my $got_etag = undef;
     while() {
         my ($dataref, $bytesleft, $etag, $custom_md5) = $self->{driver}->download_with_range($key, $offset, $offset + $self->{multisegment_threshold});
 
         # Если объект не найден - возвращаем undef
         # даже если при мультисегментном скачивании объект неожиданно исчез на каком-то сегменте, значит
         # его кто-то удалил, нужно всё же вернуть undef
+        # При этом, при скачивании в файл, часть данных может быть уже записана. Удаляйте их сами.
         return unless ($dataref);
+
+        if (defined $got_etag) {
+            # Во время скачивания, кто-то подменил файл (ETag изменился), В соотв. с HTTP, ETag гарантированно
+            # будет разным для разных файлов (но не факт что одинаковым для одинаковых)
+            # В этом случае падаем.. Наверное можно в будущем делать retry запросов..
+            confess "File changed during download. Race condition. Please retry request"
+                unless $got_etag eq $etag;
+        }
+        else {
+            $got_etag = $etag;
+        }
 
         # Проверяем md5 только если ETag "нормальный" с md5 (был не multipart upload)
         if (!defined $check_md5) {

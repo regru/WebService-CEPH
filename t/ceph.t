@@ -321,6 +321,19 @@ describe CEPH => sub {
             });
             ok ! defined $ceph->download($key);
         };
+        it "multisegment download should confess if etag changed" => sub {
+            $driver->expects('download_with_range')->exactly(2)->returns(sub{
+                my ($self, $key, $first, $last) = @_;
+                if ($first) {
+                    return (\"Test2", 0, "1111f35ad1161afbeb6ea667e5dd5dab-2861")
+                }
+                else {
+                    return (\"Test", 10, "696df35ad1161afbeb6ea667e5dd5dab-2861")
+                }
+            });
+            ok ! eval { $ceph->download($key); 1; };
+            like "$@", qr/File changed during download/;
+        };
         it "download should confess on non-ascii data" => sub {
             $driver->expects('download_with_range')->never;
             ok ! eval { $ceph->download("key\x{b5}"); 1 };
