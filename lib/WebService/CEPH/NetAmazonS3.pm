@@ -317,7 +317,7 @@ sub size {
         confess "Unknown error ".$http_response->code;
     }
     else {
-        return $http_response->header('Content-Length');
+        return $http_response->header('Content-Length') // 0;
     }
 
 

@@ -236,6 +236,18 @@ test_case "Get size" => sub {
     $connect->send_response($resp);
 };
 
+test_case "Get size when in zero-size object Content-Length is omited" => sub {
+    my ($msg, $ceph) = @_;
+    is $ceph->size('mykey'), 0;
+} => sub {
+    my ($msg, $connect, $request) = @_;
+    die unless $request->url eq '/testbucket/mykey';
+    die unless $request->method eq 'HEAD';
+    my $resp = HTTP::Response->new(200, 'OK');
+    $resp->header(ETag => "d41d8cd98f00b204e9800998ecf8427e");
+    $connect->send_response($resp);
+};
+
 test_case "Get size for non existing key" => sub {
     my ($msg, $ceph) = @_;
     ok ! defined $ceph->size('mykey'), $msg;

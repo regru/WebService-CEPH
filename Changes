@@ -1,3 +1,6 @@
+0.012     2016-06-19
+          Workaround. For zero-size object CEPH does not return Content-Lenth header at all.
+
 0.011     2016-06-19
           Workaround for http://lists.ceph.com/pipermail/ceph-users-ceph.com/2016-June/010704.html
           implemented. Now it make at least 2 requests during downloads.
