@@ -205,6 +205,9 @@ sub _upload {
 Если размер объекта по факту окажется больше multisegment_threshold,
 объект будет скачан несколькими запросами с заголовком Range (т.е. multi segment download).
 
+В данный момент есть workaround для бага http://lists.ceph.com/pipermail/ceph-users-ceph.com/2016-June/010704.html,
+в связи с ним всегда делается лишний HTTP запрос - запрос длины файла. Плюс не исключён Race condition.
+
 =cut
 
 sub download {
@@ -232,6 +235,9 @@ sub download {
 
 Если размер объекта по факту окажется больше multisegment_threshold,
 объект будет скачан несколькими запросами с заголовком Range (т.е. multi segment download).
+
+В данный момент есть workaround для бага http://lists.ceph.com/pipermail/ceph-users-ceph.com/2016-June/010704.html,
+в связи с ним всегда делается лишний HTTP запрос - запрос длины файла. Плюс не исключён Race condition.
 
 =cut
 
