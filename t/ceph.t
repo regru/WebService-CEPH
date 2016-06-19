@@ -84,9 +84,15 @@ describe CEPH => sub {
             is $ceph->{multisegment_threshold}, $new_threshold;
         };
 
-        it "should cath bad threshold" => sub {
+        it "should catch bad threshold" => sub {
             ok ! eval { WebService::CEPH->new(@mandatory_params, multipart_threshold => 5*1024*1024-1); 1 };
             like "$@", qr/should be greater or eq.*MINIMAL_MULTIPART_PART/;
+        };
+
+        it "should set optional query_string_authentication_host_replace" => sub {
+            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
+            my $ceph = WebService::CEPH->new(@mandatory_params, query_string_authentication_host_replace => 'hello');
+            is $ceph->{query_string_authentication_host_replace}, 'hello';
         };
 
         it "should catch extra args" => sub {
