@@ -18,6 +18,8 @@ fs_shadow_path - путь к файловой системе, указывает
 Скачивание файлов происходит с 's3', при ошибке скачивания, никакого фейловера на файловую систему не производится.
 В режиме 'fs' закачивание и скачивание файлов происходит только в файловую систему.
 
+Метаинформация (x-amz-meta-md5, content-type в файловой системе не сохраняется).
+
 В методах download_to_file, upload_from_file в режиме файловой системы, работа с локальными файлами
 делается максимально совместимо с режимом 's3' (права (umask) при создании файла, режимы truncate и seek при работе
 с filehandles)
@@ -71,7 +73,7 @@ sub upload {
     my ($self, $key) = (shift, shift);
 
     if ($self->{mode} =~ /s3/) {
-        $self->SUPER::upload($key, $_[0]);
+        $self->SUPER::upload($key, $_[0], $_[1]);
     }
     if ($self->{mode} =~ /fs/) {
         my $path = $self->_filepath($key, 1);
@@ -83,10 +85,10 @@ sub upload {
 }
 
 sub upload_from_file {
-    my ($self, $key, $fh_or_filename) = @_;
+    my ($self, $key, $fh_or_filename, $content_type) = @_;
 
     if ($self->{mode} =~ /s3/) {
-        $self->SUPER::upload_from_file($key, $fh_or_filename);
+        $self->SUPER::upload_from_file($key, $fh_or_filename, $content_type);
     }
     if ($self->{mode} =~ /fs/) {
         my $path = $self->_filepath($key, 1);

@@ -95,8 +95,13 @@ describe "FS Shadow" => sub {
         };
         it "should work in s3 mode" => sub {
             $ceph->{mode} = 's3';
-            WebService::CEPH->expects('upload')->with('mykey', 'mydata')->once;
+            WebService::CEPH->expects('upload')->with('mykey', 'mydata', undef)->once;
             $ceph->upload('mykey', 'mydata');
+        };
+        it "should work in s3 mode with content-type" => sub {
+            $ceph->{mode} = 's3';
+            WebService::CEPH->expects('upload')->with('mykey', 'mydata', 'text/plain')->once;
+            $ceph->upload('mykey', 'mydata', 'text/plain');
         };
         it "should work in fs mode" => sub {
             $ceph->{mode} = 'fs';
@@ -106,7 +111,7 @@ describe "FS Shadow" => sub {
         };
         it "should work in s3-fs mode" => sub {
             $ceph->{mode} = 's3-fs';
-            WebService::CEPH->expects('upload')->with('mykey', 'mydata')->once;
+            WebService::CEPH->expects('upload')->with('mykey', 'mydata', undef)->once;
             $ceph->upload('mykey', 'mydata');
             check_object_file($object_file, 'mydata');
         };
@@ -126,8 +131,13 @@ describe "FS Shadow" => sub {
         };
         it "should work in s3 mode" => sub {
             $ceph->{mode} = 's3';
-            WebService::CEPH->expects('upload_from_file')->with('mykey', $localfile)->once;
+            WebService::CEPH->expects('upload_from_file')->with('mykey', $localfile, undef)->once;
             $ceph->upload_from_file('mykey', $localfile);
+        };
+        it "should work in s3 mode with content-type" => sub {
+            $ceph->{mode} = 's3';
+            WebService::CEPH->expects('upload_from_file')->with('mykey', $localfile, 'text/plain')->once;
+            $ceph->upload_from_file('mykey', $localfile, 'text/plain');
         };
         it "should work in fs mode" => sub {
             $ceph->{mode} = 'fs';
@@ -145,7 +155,7 @@ describe "FS Shadow" => sub {
         };
         it "should work in s3-fs mode" => sub {
             $ceph->{mode} = 's3-fs';
-            WebService::CEPH->expects('upload_from_file')->with('mykey', $localfile)->once;
+            WebService::CEPH->expects('upload_from_file')->with('mykey', $localfile, undef)->once;
             $ceph->upload_from_file('mykey', $localfile);
             check_object_file($object_file, 'MyFileData');
         };
