@@ -102,7 +102,7 @@ sub download {
         return $self->SUPER::download($key);
     }
     elsif ($self->{mode} =~ /fs/) {
-        read_file( $self->_filepath($key), binmode => ':raw' )
+        return scalar read_file( $self->_filepath($key), binmode => ':raw' )
     }
 }
 
