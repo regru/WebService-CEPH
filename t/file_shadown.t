@@ -25,21 +25,27 @@ describe "FS Shadow" => sub {
         it "should work" => sub {
             WebService::CEPH->expects('new')->returns(sub {
                 my ($self, %opts) = @_;
-                cmp_deeply \%opts, { map { $_ => $_ } @ceph_opts };
+                cmp_deeply \%opts, +{ map { $_ => $_ } @ceph_opts};
                 return bless \%opts, 'WebService::CEPH';
             });
-            my $ceph = WebService::CEPH::FileShadow->new(map { $_ => $_ } @all_opts);
-            is $ceph->{$_}, $_ for @fs_opts;
+            my $ceph = WebService::CEPH::FileShadow->new(( map { $_ => $_ } @all_opts), mode => 's3-fs' );
+            is $ceph->{'mode'}, 's3-fs';
+            is $ceph->{'fs_shadow_path'}, 'fs_shadow_path/';
         };
     };
 
     describe "_filepath" => sub {
         my ($ceph);
         before each => sub {
-            $ceph = bless +{ bucket => 'abc', fs_shadow_path => '/var/srs/' }, 'WebService::CEPH::FileShadow';
+            $ceph = bless +{ bucket => 'abc', fs_shadow_path => "$tmpdir/" }, 'WebService::CEPH::FileShadow';
         };
         it "should work" => sub {
-            is $ceph->_filepath('def'), '/var/srs/abc/def';
+            is $ceph->_filepath('def'), $tmpdir."/abc/def";
+            ok ! -d $tmpdir."/abc/";
+        };
+        it "should work and create dir" => sub {
+            is $ceph->_filepath('def', 1), $tmpdir."/abc/def";
+            ok -d $tmpdir."/abc/";
         };
         it "should deny directory traverse" => sub {
             ok ! eval { $ceph->_filepath('../x'); 1; };
@@ -48,10 +54,10 @@ describe "FS Shadow" => sub {
             ok ! eval { $ceph->_filepath('def/..'); 1; };
         };
         it "but allow slash" => sub {
-            is $ceph->_filepath('def/xyz'), '/var/srs/abc/def/xyz';
+            is $ceph->_filepath('def/xyz'), $tmpdir."/abc/def/xyz";
         };
         it "and allow two dots" => sub {
-            is $ceph->_filepath('def..xyz'), '/var/srs/abc/def..xyz';
+            is $ceph->_filepath('def..xyz'), $tmpdir."/abc/def..xyz";
         };
     };
 
@@ -67,6 +73,7 @@ describe "FS Shadow" => sub {
             $ceph = bless +{ fs_shadow_path => "$tmpdir/", bucket => $bucket, }, 'WebService::CEPH::FileShadow';
             $object_file = "$tmpdir/mybucket/mykey";
             unlink $object_file;
+            !-d "$tmpdir/mybucket/" or rmdir("$tmpdir/mybucket/") or confess "expected empty dir here $!";
         };
         it "should work in s3 mode" => sub {
             $ceph->{mode} = 's3';
@@ -187,6 +194,87 @@ describe "FS Shadow" => sub {
             WebService::CEPH->expects('download_to_file')->with('mykey', $localfile)->once;
             $ceph->download_to_file('mykey', $localfile);
             ok 1;
+        };
+    };
+
+    describe "size" => sub {
+        my ($ceph, $object_file);
+        before each => sub {
+            $ceph = bless +{ fs_shadow_path => "$tmpdir/", bucket => $bucket, }, 'WebService::CEPH::FileShadow';
+            $object_file = "$tmpdir/mybucket/mykey";
+            unlink $object_file;
+            open my $f, ">", $object_file;
+            print $f "MyFileData";
+            close $f;
+        };
+        it "should work in s3 mode" => sub {
+            $ceph->{mode} = 's3';
+            WebService::CEPH->expects('size')->with('mykey')->returns(4242);
+            is $ceph->size('mykey'), 4242;
+        };
+        it "should work in fs mode" => sub {
+            $ceph->{mode} = 'fs';
+            WebService::CEPH->expects('size')->never;
+            is $ceph->size('mykey'), -s $object_file;
+        };
+        it "should work in s3-fs mode" => sub {
+            $ceph->{mode} = 's3-fs';
+            WebService::CEPH->expects('size')->with('mykey')->returns(4242);
+            is $ceph->size('mykey'), 4242;
+        };
+    };
+
+    describe "delete" => sub {
+        my ($ceph, $object_file);
+        before each => sub {
+            $ceph = bless +{ fs_shadow_path => "$tmpdir/", bucket => $bucket, }, 'WebService::CEPH::FileShadow';
+            $object_file = "$tmpdir/mybucket/mykey";
+            unlink $object_file;
+            open my $f, ">", $object_file;
+            print $f "MyFileData";
+            close $f;
+        };
+        it "should work in s3 mode" => sub {
+            $ceph->{mode} = 's3';
+            WebService::CEPH->expects('delete')->with('mykey')->once;
+            ok -f $object_file;
+            $ceph->delete('mykey');
+            ok -f $object_file;
+        };
+        it "should work in fs mode" => sub {
+            $ceph->{mode} = 'fs';
+            ok -f $object_file;
+            WebService::CEPH->expects('delete')->never;
+            $ceph->delete('mykey');
+            ok ! -f $object_file;
+        };
+        it "should work in s3-fs mode" => sub {
+            $ceph->{mode} = 's3-fs';
+            WebService::CEPH->expects('delete')->with('mykey')->once;
+            ok -f $object_file;
+            $ceph->delete('mykey');
+            ok -f $object_file;
+        };
+    };
+    describe "query_string_authentication_uri" => sub {
+        my ($ceph);
+        before each => sub {
+            $ceph = bless +{ fs_shadow_path => "$tmpdir/", bucket => $bucket, }, 'WebService::CEPH::FileShadow';
+        };
+        it "should work in s3 mode" => sub {
+            $ceph->{mode} = 's3';
+            WebService::CEPH->expects('query_string_authentication_uri')->with('mykey', 11)->returns(42);
+            is $ceph->query_string_authentication_uri('mykey', 11), 42;
+        };
+        it "should confess in fs mode" => sub {
+            $ceph->{mode} = 'fs';
+            WebService::CEPH->expects('query_string_authentication_uri')->never;
+            ok ! eval { $ceph->query_string_authentication_uri('mykey'); 1};
+        };
+        it "should work in s3-fs mode" => sub {
+            $ceph->{mode} = 's3-fs';
+            WebService::CEPH->expects('query_string_authentication_uri')->with('mykey', 11)->returns(42);
+            is $ceph->query_string_authentication_uri('mykey', 11), 42;
         };
     };
 };

@@ -2,25 +2,50 @@ package WebService::CEPH::FileShadow;
 
 # VERSION
 
+=head1 WebService::CEPH::FileShadow
+
+Потомок WebService::CEPH.
+
+Опции конструктора те же самые, плюс ещё есть:
+
+mode - 's3' или 's3-fs' или 'fs'
+
+fs_shadow_path - путь к файловой системе, указывает на директорию, финальный слэш не обязателен.
+
+В режиме s3 всё работает, как WebService::CEPH, файлы скачиваются и закачиваются в CEPH по протоколу s3.
+В режиме 's3-fs' при закачке файла, создаётся его копия в файловой системе. Сначала файл закачивается в s3, потом
+в файловую систему, если в это время случится исключение, предыдущий шаг не отменяется.
+Скачивание файлов происходит с 's3', при ошибке скачивания, никакого фейловера на файловую систему не производится.
+В режиме 'fs' закачивание и скачивание файлов происходит только в файловую систему.
+
+В методах download_to_file, upload_from_file в режиме файловой системы, работа с локальными файлами
+делается максимально совместимо с режимом 's3' (права (umask) при создании файла, режимы truncate и seek при работе
+с filehandles)
+
+Имя ключа объекта не должно содержать символов, опасных для файловой системы (например '../', '/..') иначе
+будет исключение. Однако по-настоящему заботится о безопасности должен вызывающий.
+
+=cut
+
 use strict;
 use warnings;
 use Carp;
 use Fcntl qw/:seek/;
 use File::Copy;
 use File::Slurp qw/read_file/;
+use File::Path qw(make_path);
 use parent qw( WebService::CEPH );
-
-=head2 upload
-
-Перекрытый метод WebService::CEPH
-
-=cut
 
 sub new {
     my ($class, %options) = @_;
     my %new_options;
 
     $new_options{$_} = delete $options{$_} for (qw/fs_shadow_path mode/);
+
+    m!/$! or $_ .= '/' for $new_options{fs_shadow_path};
+    confess "mode should be 's3', 's3-fs' or 'fs', but it is '$new_options{mode}'"
+        unless $new_options{mode} =~ /^(s3|s3\-fs|fs)$/;
+
     my $self = $class->SUPER::new(%options);
 
     $self->{$_} = $new_options{$_} for keys %new_options;
@@ -29,10 +54,15 @@ sub new {
 }
 
 sub _filepath {
-    my ($self, $key) = @_;
-    confess if $key =~ m!\.\./!;
-    confess if $key =~ m!/\.\.!;
-    $self->{fs_shadow_path}.$self->{bucket}."/".$key;
+    my ($self, $key, $should_mkpath) = @_;
+    confess "key expected" unless defined $key;
+    confess "unsecure key" if $key eq '.';
+    confess "unsecure key" if $key =~ m!\.\./!;
+    confess "unsecure key" if $key =~ m!/\.\.!;
+    confess "constructor should normalize path" unless $self->{fs_shadow_path} =~ m!/$!;
+    my $dir = $self->{fs_shadow_path}.$self->{bucket}."/";
+    make_path($dir) if ($should_mkpath);
+    $dir.$key;
 }
 sub upload {
     my ($self, $key) = (shift, shift);
@@ -41,7 +71,7 @@ sub upload {
         $self->SUPER::upload($key, $_[0]);
     }
     if ($self->{mode} =~ /fs/) {
-        my $path = $self->_filepath($key);
+        my $path = $self->_filepath($key, 1);
         open my $f, ">", $path or confess;
         binmode $f;
         print $f $_[0] or confess;
@@ -56,7 +86,7 @@ sub upload_from_file {
         $self->SUPER::upload_from_file($key, $fh_or_filename);
     }
     if ($self->{mode} =~ /fs/) {
-        my $path = $self->_filepath($key);
+        my $path = $self->_filepath($key, 1);
         seek($fh_or_filename, 0, SEEK_SET) if (ref $fh_or_filename);
         copy($fh_or_filename, $path);
     }
