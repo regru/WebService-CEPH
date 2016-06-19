@@ -1,4 +1,4 @@
-package WebService::CEPH::FileShadow;
+=encoding utf8
 
 # VERSION
 
@@ -28,6 +28,8 @@ fs_shadow_path - путь к файловой системе, указывает
 будет исключение. Однако по-настоящему заботится о безопасности должен вызывающий.
 
 =cut
+
+package WebService::CEPH::FileShadow;
 
 use strict;
 use warnings;
