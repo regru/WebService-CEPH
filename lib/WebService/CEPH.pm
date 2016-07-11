@@ -411,4 +411,16 @@ sub query_string_authentication_uri {
     $uri;
 }
 
+=head2 get_buckets_ist
+
+Returns buckets list
+
+=cut
+
+sub get_buckets_ist {
+    my ($self) = @_;
+
+    return $self->{driver}->get_buckets_list;
+}
+
 1;

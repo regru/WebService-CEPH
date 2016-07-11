@@ -54,7 +54,8 @@ sub new {
 
     my $self = bless +{}, $class;
 
-    $self->{$_} = delete $args{$_} // confess "Missing $_" for (qw/protocol host bucket key secret/);
+    $self->{$_}     = delete $args{$_} // confess "Missing $_" for (qw/protocol host key secret/);
+    $self->{bucket} = delete $args{bucket};
 
     confess "Unused arguments %args" if %args;
     confess "protocol should be 'http' or 'https'" unless $self->{protocol} =~ /^https?$/;
@@ -82,6 +83,18 @@ sub _request_object {
     my ($self) = @_;
 
     $self->{client}->bucket(name => $self->{bucket});
+}
+
+=head2 get_buckets_ist
+
+Returns buckets list
+
+=cut
+
+sub get_buckets_ist {
+    my ($self) = @_;
+
+    return $self->{client}->buckets;
 }
 
 =head2 upload_single_request
