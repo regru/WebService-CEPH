@@ -70,9 +70,9 @@ sub new {
 
     # mandatory
     $self->{$_} = delete $args{$_} // confess "Missing $_"
-        for (qw/protocol host bucket key secret/);
+        for (qw/protocol host key secret/);
     # optional
-    for (qw/driver_name multipart_threshold multisegment_threshold query_string_authentication_host_replace/) {
+    for (qw/bucket driver_name multipart_threshold multisegment_threshold query_string_authentication_host_replace/) {
         if (defined(my $val = delete $args{$_})) {
             $self->{$_} = $val;
         }
@@ -417,7 +417,7 @@ Returns buckets list
 
 =cut
 
-sub get_buckets_ist {
+sub get_buckets_list {
     my ($self) = @_;
 
     return $self->{driver}->get_buckets_list;

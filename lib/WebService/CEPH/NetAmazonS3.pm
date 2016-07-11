@@ -82,6 +82,8 @@ sub new {
 sub _request_object {
     my ($self) = @_;
 
+    confess "Missing bucket" unless $self->{bucket};
+
     $self->{client}->bucket(name => $self->{bucket});
 }
 
@@ -91,7 +93,7 @@ Returns buckets list
 
 =cut
 
-sub get_buckets_ist {
+sub get_buckets_list {
     my ($self) = @_;
 
     return $self->{client}->buckets;
@@ -150,6 +152,8 @@ sub upload_single_request {
 
 sub initiate_multipart_upload {
     my ($self, $key, $md5, $content_type) = @_;
+
+    confess "Missing bucket" unless $self->{bucket};
 
     my $object = $self->_request_object->object( key => $key, acl_short => 'private' );
 
@@ -262,6 +266,7 @@ sub complete_multipart_upload {
 sub download_with_range {
     my ($self, $key, $first, $last) = @_;
 
+    confess "Missing bucket" unless $self->{bucket};
 
     # TODO: How and when to validate ETag here?
     my $http_request = Net::Amazon::S3::Request::GetObject->new(
@@ -322,6 +327,8 @@ sub download_with_range {
 
 sub size {
     my ($self, $key) = @_;
+
+    confess "Missing bucket" unless $self->{bucket};
 
     my $http_request = Net::Amazon::S3::Request::GetObject->new(
         s3     => $self->{client}->s3,
