@@ -96,7 +96,7 @@ Returns buckets list
 sub get_buckets_list {
     my ($self) = @_;
 
-    return $self->{client}->buckets;
+    return $self->{client}->buckets->{buckets};
 }
 
 =head2 upload_single_request
