@@ -423,4 +423,37 @@ sub get_buckets_list {
     return $self->{driver}->get_buckets_list;
 }
 
+=head2 list_multipart_uploads
+
+Возвращает список multipart загрузок в бакете
+
+=cut
+
+sub list_multipart_uploads {
+    my ($self) = @_;
+
+    confess "Bucket name is required" unless $self->{bucket};
+
+    return $self->{driver}->list_multipart_uploads();
+}
+
+=head2 delete_multipart_upload
+
+Удаляет multipart загрузку в бакете
+
+Параметры позиционные: $key, $upload_id
+
+Ничего не возвращает
+
+=cut
+
+sub delete_multipart_upload {
+    my ( $self, $key, $upload_id ) = @_;
+
+    confess "Bucket name is required" unless $self->{bucket};
+    confess "key and upload ID is required" unless $key && $upload_id;
+
+    $self->{driver}->delete_multipart_upload($key, $upload_id);
+}
+
 1;

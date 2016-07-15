@@ -131,6 +131,77 @@ sub upload_single_request {
     $object->_put($_[0], length($_[0]), $md5); # private _put so we can re-use md5. only for that.
 }
 
+=head2 list_multipart_uploads
+
+Возвращает список multipart_upload
+
+Параметры:
+
+нет
+
+Возвращает:
+
+    [
+        {
+            key       => 'Upload key',
+            upload_id => 'Upload ID',
+        },
+        ...
+    ]
+
+=cut
+
+sub list_multipart_uploads {
+    my ($self) = @_;
+
+    $self->{client}->bucket(name => $self->{bucket});
+
+    my $http_request = Net::Amazon::S3::HTTPRequest->new(
+        s3     => $self->{client}->s3,
+        method => 'GET',
+        path   => $self->{bucket} . '?uploads',
+    )->http_request;
+
+    my $xpc = $self->{client}->_send_request_xpc($http_request);
+
+    my @uploads;
+    foreach my $node ( $xpc->findnodes(".//s3:Upload") ) {
+        push @uploads, {
+            key       => $xpc->findvalue( ".//s3:Key", $node ),
+            upload_id => $xpc->findvalue( ".//s3:UploadId", $node ),
+            initiated => $xpc->findvalue( ".//s3:Initiated", $node ),
+        };
+
+    }
+
+    return \@uploads;
+}
+
+=head2 delete_multipart_upload
+
+Удаляет аплоад
+
+Параметры:
+
+    $key, $upload_id
+
+=cut
+
+sub delete_multipart_upload {
+    my ($self, $key, $upload_id) = @_;
+
+    $self->{client}->bucket(name => $self->{bucket});
+
+    my $http_request = Net::Amazon::S3::Request::AbortMultipartUpload->new(
+        s3                  => $self->{client}->s3,
+        bucket              => $self->{bucket},
+        key                 => $key,
+        upload_id           => $upload_id,
+    )->http_request;
+
+    $self->{client}->_send_request_raw($http_request);
+}
+
 =head2 initiate_multipart_upload
 
 Инициирует multipart upload
