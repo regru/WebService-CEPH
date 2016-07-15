@@ -88,7 +88,7 @@ sub new {
         if $self->{multipart_threshold} < MINIMAL_MULTIPART_PART;
 
     my $driver_class = __PACKAGE__."::".$self->{driver_name}; # should be loaded via "use" at top of file
-    $self->{driver} = $driver_class->new(map { $_ => $self->{$_} } qw/protocol host bucket key secret/ );
+    $self->{driver} = $driver_class->new(map { $_ => $self->{$_} } qw/protocol host key secret bucket/ );
 
     $self;
 }

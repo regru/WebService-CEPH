@@ -28,7 +28,6 @@ describe CEPH => sub {
         my @mandatory_params = (
                 protocol => 'http',
                 host => 'myhost',
-                bucket => 'mybucket',
                 key => 'accesskey',
                 secret => 'supersecret',
         );
@@ -36,7 +35,7 @@ describe CEPH => sub {
         my $driver = mock();
 
         it "should work" => sub {
-            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
+            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params, bucket => undef)->returns($driver);
 
             my $ceph = WebService::CEPH->new(@mandatory_params);
 
@@ -60,7 +59,7 @@ describe CEPH => sub {
         }
 
         it "should override driver" => sub {
-            WebService::CEPH::XXX->expects('new')->with(@mandatory_params)->returns($driver);
+            WebService::CEPH::XXX->expects('new')->with(@mandatory_params, bucket => undef)->returns($driver);
 
             my $ceph = WebService::CEPH->new(@mandatory_params, driver_name => 'XXX');
             is $ceph->{driver_name}, 'XXX';
@@ -68,7 +67,7 @@ describe CEPH => sub {
 
         it "should override multipart threshold" => sub {
             my $new_threshold = 10_000_000;
-            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
+            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params, bucket => undef)->returns($driver);
 
             my $ceph = WebService::CEPH->new(@mandatory_params, multipart_threshold => $new_threshold);
 
@@ -77,7 +76,7 @@ describe CEPH => sub {
 
         it "should override multisegment threshold" => sub {
             my $new_threshold = 10_000_000;
-            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
+            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params, bucket => undef)->returns($driver);
 
             my $ceph = WebService::CEPH->new(@mandatory_params,multisegment_threshold => $new_threshold);
 
@@ -90,7 +89,7 @@ describe CEPH => sub {
         };
 
         it "should set optional query_string_authentication_host_replace" => sub {
-            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
+            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params, bucket => undef)->returns($driver);
             my $ceph = WebService::CEPH->new(@mandatory_params, query_string_authentication_host_replace => 'hello');
             is $ceph->{query_string_authentication_host_replace}, 'hello';
         };
