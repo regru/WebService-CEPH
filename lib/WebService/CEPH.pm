@@ -180,6 +180,8 @@ sub _upload {
     # after that $_[0] is data (scalar or filehandle)
     my ($self, $key, $iterator, $length, $md5_hex, $content_type) = (shift, shift, shift, shift, shift, shift);
 
+    confess "Bucket name is required" unless $self->{bucket};
+
     _check_ascii_key($key);
 
     if ($length > $self->{multipart_threshold}) {
@@ -300,6 +302,8 @@ sub download_to_file {
 sub _download {
     my ($self, $key, $appender) = @_;
 
+    confess "Bucket name is required" unless $self->{bucket};
+
     _check_ascii_key($key);
 
     my $offset = 0;
@@ -365,6 +369,8 @@ sub _download {
 sub size {
     my ($self, $key) = @_;
 
+    confess "Bucket name is required" unless $self->{bucket};
+
     _check_ascii_key($key);
 
     $self->{driver}->size($key);
@@ -379,6 +385,8 @@ sub size {
 
 sub delete {
     my ($self, $key) = @_;
+
+    confess "Bucket name is required" unless $self->{bucket};
 
     _check_ascii_key($key);
 
