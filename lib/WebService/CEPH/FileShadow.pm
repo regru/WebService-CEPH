@@ -1,7 +1,7 @@
 package WebService::CEPH::FileShadow;
 
 
-our $VERSION = 0.014;
+# VERSION
 
 =head1 WebService::CEPH::FileShadow
 
