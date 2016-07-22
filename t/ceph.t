@@ -173,6 +173,74 @@ describe CEPH => sub {
             ok ! eval { $ceph->upload("key\x{b5}", "a"); 1 };
         };
     };
+
+    describe get_buckets_list => sub {
+        my ($driver, $ceph, $multipart_data, $key);
+
+        before each => sub {
+            $driver = mock();
+            $ceph = bless +{ driver => $driver, multipart_threshold => 2 }, 'WebService::CEPH';
+        };
+
+        it "should work" => sub {
+            $driver->expects('get_buckets_list');
+            $ceph->get_buckets_list;
+            ok 1;
+        };
+    };
+
+    describe list_multipart_uploads => sub {
+        my ($driver, $ceph, $multipart_data, $key);
+
+        before each => sub {
+            $driver = mock();
+            $ceph = bless +{ driver => $driver, multipart_threshold => 2, bucket => 'mybucket' }, 'WebService::CEPH';
+        };
+
+        it "should confess without bucket" => sub {
+            undef $ceph->{bucket};
+            ok ! eval { $ceph->list_multipart_uploads(); 1 };
+            like "$@", qr/Bucket name is required/;
+        };
+
+        it "should work" => sub {
+            $driver->expects('list_multipart_uploads');
+            $ceph->list_multipart_uploads;
+            ok 1;
+        };
+    };
+
+    describe delete_multipart_upload => sub {
+        my ($driver, $ceph, $multipart_data, $key);
+
+        before each => sub {
+            $driver = mock();
+            $ceph = bless +{ driver => $driver, multipart_threshold => 2, bucket => 'mybucket' }, 'WebService::CEPH';
+        };
+
+        it "should confess without bucket" => sub {
+            undef $ceph->{bucket};
+            ok ! eval { $ceph->delete_multipart_upload(); 1 };
+            like "$@", qr/Bucket name is required/;
+        };
+
+        it "should confess without upload id" => sub {
+            ok ! eval { $ceph->delete_multipart_upload('key', undef); 1 };
+            like "$@", qr/key and upload ID is required/;
+        };
+
+        it "should confess without key" => sub {
+            ok ! eval { $ceph->delete_multipart_upload(undef, 'upload_id'); 1 };
+            like "$@", qr/key and upload ID is required/;
+        };
+
+        it "should work" => sub {
+            $driver->expects('delete_multipart_upload')->with('key', 'upload_id');
+            $ceph->delete_multipart_upload('key', 'upload_id');
+            ok 1;
+        };
+    };
+
     describe upload_from_file => sub {
         my ($driver, $ceph, $multipart_data, $key);
 
