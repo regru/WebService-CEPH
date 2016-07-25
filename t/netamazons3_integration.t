@@ -25,6 +25,19 @@ sub test_case {
 ## Test cases
 ##
 
+test_case "get_buckets_list" => sub {
+    my ($msg, $ceph) = @_;
+    $ceph->get_buckets_list();
+    ok 1, "$msg"
+
+} => sub {
+    my ($msg, $connect, $request) = @_;
+    die unless $request->url eq '/';
+    my $resp = HTTP::Response->new(200, 'OK');
+    $resp->header(ETag => md5_hex($request->content));
+    $connect->send_response($resp);
+};
+
 # upload_single_request
 
 test_case "Upload single request" => sub {
