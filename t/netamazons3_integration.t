@@ -34,6 +34,26 @@ test_case "get_buckets_list" => sub {
     my ($msg, $connect, $request) = @_;
     die unless $request->url eq '/';
     my $resp = HTTP::Response->new(200, 'OK');
+    $resp->content(<<'XML');
+<?xml version="1.0" encoding="UTF-8"?>
+<ListAllMyBucketsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01">
+  <Owner>
+    <ID>bcaf1ffd86f461ca5fb16fd081034f</ID>
+    <DisplayName>webfile</DisplayName>
+  </Owner>
+  <Buckets>
+    <Bucket>
+      <Name>quotes</Name>
+      <CreationDate>2006-02-03T16:45:09.000Z</CreationDate>
+    </Bucket>
+    <Bucket>
+      <Name>samples</Name>
+      <CreationDate>2006-02-03T16:41:58.000Z</CreationDate>
+    </Bucket>
+  </Buckets>
+</ListAllMyBucketsResult>
+XML
+
     $resp->header(ETag => md5_hex($request->content));
     $connect->send_response($resp);
 };
