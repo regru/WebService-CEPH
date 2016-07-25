@@ -56,6 +56,62 @@ sub test_case {
 #    $connect->send_response($resp);
 #};
 
+
+test_case "list_multipart_uploads" => sub {
+    my ($msg, $ceph) = @_;
+    $ceph->list_multipart_uploads();
+    ok 1, "$msg"
+
+} => sub {
+    my ($msg, $connect, $request) = @_;
+    die unless $request->url eq '/testbucket?uploads';
+    my $resp = HTTP::Response->new(200, 'OK');
+    $resp->content(<<'XML');
+<?xml version="1.0" encoding="UTF-8"?>
+<ListMultipartUploadsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+  <Bucket>bucket</Bucket>
+  <KeyMarker></KeyMarker>
+  <UploadIdMarker></UploadIdMarker>
+  <NextKeyMarker>my-movie.m2ts</NextKeyMarker>
+  <NextUploadIdMarker>YW55IGlkZWEgd2h5IGVsdmluZydzIHVwbG9hZCBmYWlsZWQ</NextUploadIdMarker>
+  <MaxUploads>3</MaxUploads>
+  <IsTruncated>true</IsTruncated>
+  <Upload>
+    <Key>my-divisor</Key>
+    <UploadId>XMgbGlrZSBlbHZpbmcncyBub3QgaGF2aW5nIG11Y2ggbHVjaw</UploadId>
+    <Initiator>
+      <ID>arn:aws:iam::111122223333:user/user1-11111a31-17b5-4fb7-9df5-b111111f13de</ID>
+      <DisplayName>user1-11111a31-17b5-4fb7-9df5-b111111f13de</DisplayName>
+    </Initiator>
+    <Owner>
+      <ID>75aa57f09aa0c8caeab4f8c24e99d10f8e7faeebf76c078efc7c6caea54ba06a</ID>
+      <DisplayName>OwnerDisplayName</DisplayName>
+    </Owner>
+    <StorageClass>STANDARD</StorageClass>
+    <Initiated>2010-11-10T20:48:33.000Z</Initiated>
+  </Upload>
+</ListMultipartUploadsResult>
+XML
+
+    $resp->header(ETag => md5_hex($request->content));
+    $connect->send_response($resp);
+};
+
+
+test_case "delete_multipart_upload" => sub {
+    my ($msg, $ceph) = @_;
+    $ceph->delete_multipart_upload('key', 'upload_id');
+    ok 1, "$msg"
+
+} => sub {
+    my ($msg, $connect, $request) = @_;
+    die unless $request->url eq '/testbucket/key?uploadId=upload_id';
+    my $resp = HTTP::Response->new(204, 'OK');
+
+    $resp->header(ETag => md5_hex($request->content));
+    $connect->send_response($resp);
+};
+
 # upload_single_request
 
 test_case "Upload single request" => sub {
