@@ -52,7 +52,6 @@ sub test_case {
 #</ListAllMyBucketsResult>
 #XML
 #
-#    $resp->header(ETag => md5_hex($request->content));
 #    $connect->send_response($resp);
 #};
 
@@ -93,7 +92,6 @@ test_case "list_multipart_uploads" => sub {
 </ListMultipartUploadsResult>
 XML
 
-    $resp->header(ETag => md5_hex($request->content));
     $connect->send_response($resp);
 };
 
@@ -108,7 +106,6 @@ test_case "delete_multipart_upload" => sub {
     die unless $request->url eq '/testbucket/key?uploadId=upload_id';
     my $resp = HTTP::Response->new(204, 'OK');
 
-    $resp->header(ETag => md5_hex($request->content));
     $connect->send_response($resp);
 };
 
