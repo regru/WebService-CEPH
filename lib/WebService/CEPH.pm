@@ -423,6 +423,13 @@ sub query_string_authentication_uri {
 
 Returns buckets list
 
+WARNING
+
+Метод падает c ошибкой
+Attribute (owner_id) does not pass the type constraint because: Validation failed for 'OwnerId'
+Уведомления направлены разрабтчикам:
+http://tracker.ceph.com/issues/16806 и https://github.com/rustyconover/net-amazon-s3/issues/18
+
 =cut
 
 sub get_buckets_list {
