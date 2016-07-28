@@ -19,4 +19,5 @@ nytprof.out
 pm_to_blib
 *.komodoproject
 .komodotools/
+.project
 WebService-CEPH-*/

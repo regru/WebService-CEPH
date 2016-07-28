@@ -41,7 +41,7 @@ protocol - 'http' или 'https'
 
 host - хост Amazon S3 или CEPH
 
-bucket - имя бакета, этот бакет будет использоваться для всех операций объекта
+bucket - (обязателен для всех операций кроме запроса списка бакетов) имя бакета, этот бакет будет использоваться для всех операций объекта
 
 key - ключ доступа
 
@@ -54,7 +54,8 @@ sub new {
 
     my $self = bless +{}, $class;
 
-    $self->{$_} = delete $args{$_} // confess "Missing $_" for (qw/protocol host bucket key secret/);
+    $self->{$_}     = delete $args{$_} // confess "Missing $_" for (qw/protocol host key secret/);
+    $self->{bucket} = delete $args{bucket};
 
     confess "Unused arguments %args" if %args;
     confess "protocol should be 'http' or 'https'" unless $self->{protocol} =~ /^https?$/;
@@ -81,7 +82,21 @@ sub new {
 sub _request_object {
     my ($self) = @_;
 
+    confess "Missing bucket" unless $self->{bucket};
+
     $self->{client}->bucket(name => $self->{bucket});
+}
+
+=head2 get_buckets_ist
+
+Returns buckets list
+
+=cut
+
+sub get_buckets_list {
+    my ($self) = @_;
+
+    return $self->{client}->buckets->{buckets};
 }
 
 =head2 upload_single_request
@@ -116,6 +131,78 @@ sub upload_single_request {
     $object->_put($_[0], length($_[0]), $md5); # private _put so we can re-use md5. only for that.
 }
 
+=head2 list_multipart_uploads
+
+Возвращает список multipart_upload
+
+Параметры:
+
+нет
+
+Возвращает:
+
+    [
+        {
+            key       => 'Upload key',
+            upload_id => 'Upload ID',
+            initiated => 'Init date',
+        },
+        ...
+    ]
+
+=cut
+
+sub list_multipart_uploads {
+    my ($self) = @_;
+
+    $self->{client}->bucket(name => $self->{bucket});
+
+    my $http_request = Net::Amazon::S3::HTTPRequest->new(
+        s3     => $self->{client}->s3,
+        method => 'GET',
+        path   => $self->{bucket} . '?uploads',
+    )->http_request;
+
+    my $xpc = $self->{client}->_send_request_xpc($http_request);
+
+    my @uploads;
+    foreach my $node ( $xpc->findnodes(".//s3:Upload") ) {
+        push @uploads, {
+            key       => $xpc->findvalue( ".//s3:Key", $node ),
+            upload_id => $xpc->findvalue( ".//s3:UploadId", $node ),
+            initiated => $xpc->findvalue( ".//s3:Initiated", $node ),
+        };
+
+    }
+
+    return \@uploads;
+}
+
+=head2 delete_multipart_upload
+
+Удаляет аплоад
+
+Параметры:
+
+    $key, $upload_id
+
+=cut
+
+sub delete_multipart_upload {
+    my ($self, $key, $upload_id) = @_;
+
+    $self->{client}->bucket(name => $self->{bucket});
+
+    my $http_request = Net::Amazon::S3::Request::AbortMultipartUpload->new(
+        s3                  => $self->{client}->s3,
+        bucket              => $self->{bucket},
+        key                 => $key,
+        upload_id           => $upload_id,
+    )->http_request;
+
+    $self->{client}->_send_request_raw($http_request);
+}
+
 =head2 initiate_multipart_upload
 
 Инициирует multipart upload
@@ -137,6 +224,8 @@ sub upload_single_request {
 
 sub initiate_multipart_upload {
     my ($self, $key, $md5, $content_type) = @_;
+
+    confess "Missing bucket" unless $self->{bucket};
 
     my $object = $self->_request_object->object( key => $key, acl_short => 'private' );
 
@@ -249,6 +338,7 @@ sub complete_multipart_upload {
 sub download_with_range {
     my ($self, $key, $first, $last) = @_;
 
+    confess "Missing bucket" unless $self->{bucket};
 
     # TODO: How and when to validate ETag here?
     my $http_request = Net::Amazon::S3::Request::GetObject->new(
@@ -309,6 +399,8 @@ sub download_with_range {
 
 sub size {
     my ($self, $key) = @_;
+
+    confess "Missing bucket" unless $self->{bucket};
 
     my $http_request = Net::Amazon::S3::Request::GetObject->new(
         s3     => $self->{client}->s3,

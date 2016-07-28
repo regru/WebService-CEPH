@@ -28,15 +28,15 @@ describe CEPH => sub {
         my @mandatory_params = (
                 protocol => 'http',
                 host => 'myhost',
-                bucket => 'mybucket',
                 key => 'accesskey',
                 secret => 'supersecret',
         );
+        my @mandatory_params_with_bucket = ( @mandatory_params, bucket => undef );
         my %mandatory_params_h = @mandatory_params;
         my $driver = mock();
 
         it "should work" => sub {
-            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
+            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params_with_bucket)->returns($driver);
 
             my $ceph = WebService::CEPH->new(@mandatory_params);
 
@@ -60,7 +60,7 @@ describe CEPH => sub {
         }
 
         it "should override driver" => sub {
-            WebService::CEPH::XXX->expects('new')->with(@mandatory_params)->returns($driver);
+            WebService::CEPH::XXX->expects('new')->with(@mandatory_params_with_bucket)->returns($driver);
 
             my $ceph = WebService::CEPH->new(@mandatory_params, driver_name => 'XXX');
             is $ceph->{driver_name}, 'XXX';
@@ -68,7 +68,7 @@ describe CEPH => sub {
 
         it "should override multipart threshold" => sub {
             my $new_threshold = 10_000_000;
-            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
+            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params_with_bucket)->returns($driver);
 
             my $ceph = WebService::CEPH->new(@mandatory_params, multipart_threshold => $new_threshold);
 
@@ -77,7 +77,7 @@ describe CEPH => sub {
 
         it "should override multisegment threshold" => sub {
             my $new_threshold = 10_000_000;
-            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
+            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params_with_bucket)->returns($driver);
 
             my $ceph = WebService::CEPH->new(@mandatory_params,multisegment_threshold => $new_threshold);
 
@@ -90,7 +90,7 @@ describe CEPH => sub {
         };
 
         it "should set optional query_string_authentication_host_replace" => sub {
-            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params)->returns($driver);
+            WebService::CEPH::NetAmazonS3->expects('new')->with(@mandatory_params_with_bucket)->returns($driver);
             my $ceph = WebService::CEPH->new(@mandatory_params, query_string_authentication_host_replace => 'hello');
             is $ceph->{query_string_authentication_host_replace}, 'hello';
         };
@@ -104,7 +104,7 @@ describe CEPH => sub {
 
     describe "other methods" => sub {
         my $driver = mock();
-        my $ceph = bless +{ driver => $driver }, 'WebService::CEPH';
+        my $ceph = bless +{ driver => $driver, bucket => 'mybucket'}, 'WebService::CEPH';
         it "should return size" => sub {
             $driver->expects('size')->with('testkey')->returns(42);
             is $ceph->size('testkey'), 42;
@@ -128,7 +128,7 @@ describe CEPH => sub {
 
         before each => sub {
             $driver = mock();
-            $ceph = bless +{ driver => $driver, multipart_threshold => 2 }, 'WebService::CEPH';
+            $ceph = bless +{ driver => $driver, multipart_threshold => 2, bucket => 'mybucket' }, 'WebService::CEPH';
             $multipart_data = mock();
             $key = 'mykey';
         };
@@ -173,12 +173,80 @@ describe CEPH => sub {
             ok ! eval { $ceph->upload("key\x{b5}", "a"); 1 };
         };
     };
-    describe upload_from_file => sub {
+
+    describe get_buckets_list => sub {
         my ($driver, $ceph, $multipart_data, $key);
 
         before each => sub {
             $driver = mock();
             $ceph = bless +{ driver => $driver, multipart_threshold => 2 }, 'WebService::CEPH';
+        };
+
+        it "should work" => sub {
+            $driver->expects('get_buckets_list');
+            $ceph->get_buckets_list;
+            ok 1;
+        };
+    };
+
+    describe list_multipart_uploads => sub {
+        my ($driver, $ceph, $multipart_data, $key);
+
+        before each => sub {
+            $driver = mock();
+            $ceph = bless +{ driver => $driver, multipart_threshold => 2, bucket => 'mybucket' }, 'WebService::CEPH';
+        };
+
+        it "should confess without bucket" => sub {
+            undef $ceph->{bucket};
+            ok ! eval { $ceph->list_multipart_uploads(); 1 };
+            like "$@", qr/Bucket name is required/;
+        };
+
+        it "should work" => sub {
+            $driver->expects('list_multipart_uploads');
+            $ceph->list_multipart_uploads;
+            ok 1;
+        };
+    };
+
+    describe delete_multipart_upload => sub {
+        my ($driver, $ceph, $multipart_data, $key);
+
+        before each => sub {
+            $driver = mock();
+            $ceph = bless +{ driver => $driver, multipart_threshold => 2, bucket => 'mybucket' }, 'WebService::CEPH';
+        };
+
+        it "should confess without bucket" => sub {
+            undef $ceph->{bucket};
+            ok ! eval { $ceph->delete_multipart_upload(); 1 };
+            like "$@", qr/Bucket name is required/;
+        };
+
+        it "should confess without upload id" => sub {
+            ok ! eval { $ceph->delete_multipart_upload('key', undef); 1 };
+            like "$@", qr/key and upload ID is required/;
+        };
+
+        it "should confess without key" => sub {
+            ok ! eval { $ceph->delete_multipart_upload(undef, 'upload_id'); 1 };
+            like "$@", qr/key and upload ID is required/;
+        };
+
+        it "should work" => sub {
+            $driver->expects('delete_multipart_upload')->with('key', 'upload_id');
+            $ceph->delete_multipart_upload('key', 'upload_id');
+            ok 1;
+        };
+    };
+
+    describe upload_from_file => sub {
+        my ($driver, $ceph, $multipart_data, $key);
+
+        before each => sub {
+            $driver = mock();
+            $ceph = bless +{ driver => $driver, multipart_threshold => 2, bucket => 'mybucket' }, 'WebService::CEPH';
             $multipart_data = mock();
             $key = 'mykey';
         };
@@ -245,7 +313,7 @@ describe CEPH => sub {
 
         before each => sub {
             $driver = mock();
-            $ceph = bless +{ driver => $driver, multisegment_threshold => 2 }, 'WebService::CEPH';
+            $ceph = bless +{ driver => $driver, multisegment_threshold => 2, bucket => 'mybucket' }, 'WebService::CEPH';
             # workaround for CEPH bug http://lists.ceph.com/pipermail/ceph-users-ceph.com/2016-June/010704.html
             $ceph->expects('size')->returns(1);
             # /workaround for CEPH bug
@@ -344,7 +412,7 @@ describe CEPH => sub {
 
         before each => sub {
             $driver = mock();
-            $ceph = bless +{ driver => $driver, multisegment_threshold => 2 }, 'WebService::CEPH';
+            $ceph = bless +{ driver => $driver, multisegment_threshold => 2, bucket => 'mybucket' }, 'WebService::CEPH';
             $key = 'mykey';
             # workaround for CEPH bug http://lists.ceph.com/pipermail/ceph-users-ceph.com/2016-June/010704.html
             $ceph->expects('size')->returns(1);
@@ -403,7 +471,7 @@ describe CEPH => sub {
         before each => sub {
             $datafile = "$tmp_dir/datafile";
             $driver = mock();
-            $ceph = bless +{ driver => $driver, multisegment_threshold => 2 }, 'WebService::CEPH';
+            $ceph = bless +{ driver => $driver, multisegment_threshold => 2, bucket => 'mybucket' }, 'WebService::CEPH';
             $ceph->expects('size')->returns(0);
             $key = 'mykey';
         };
