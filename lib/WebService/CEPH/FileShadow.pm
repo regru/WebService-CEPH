@@ -1,7 +1,6 @@
 =encoding utf8
 
 
-# VERSION
 
 =head1 WebService::CEPH::FileShadow
 
@@ -31,6 +30,8 @@ fs_shadow_path - путь к файловой системе, указывает
 =cut
 
 package WebService::CEPH::FileShadow;
+
+# VERSION
 
 use strict;
 use warnings;
