@@ -22,13 +22,13 @@ protocol - http/https
 
 host - хост бэкэнда
 
-bucket - имя бакета
-
 key - ключ для входа
 
 secret - secret для входа
 
 Необязательные параметры:
+
+bucket - имя бакета (не нужен только для получения списка бакетов)
 
 driver_name - в данный момент только 'NetAmazonS3'
 
@@ -70,9 +70,9 @@ sub new {
 
     # mandatory
     $self->{$_} = delete $args{$_} // confess "Missing $_"
-        for (qw/protocol host bucket key secret/);
+        for (qw/protocol host key secret/);
     # optional
-    for (qw/driver_name multipart_threshold multisegment_threshold query_string_authentication_host_replace/) {
+    for (qw/bucket driver_name multipart_threshold multisegment_threshold query_string_authentication_host_replace/) {
         if (defined(my $val = delete $args{$_})) {
             $self->{$_} = $val;
         }
@@ -88,7 +88,7 @@ sub new {
         if $self->{multipart_threshold} < MINIMAL_MULTIPART_PART;
 
     my $driver_class = __PACKAGE__."::".$self->{driver_name}; # should be loaded via "use" at top of file
-    $self->{driver} = $driver_class->new(map { $_ => $self->{$_} } qw/protocol host bucket key secret/ );
+    $self->{driver} = $driver_class->new(map { $_ => $self->{$_} } qw/protocol host key secret bucket/ );
 
     $self;
 }
@@ -179,6 +179,8 @@ sub upload_from_file {
 sub _upload {
     # after that $_[0] is data (scalar or filehandle)
     my ($self, $key, $iterator, $length, $md5_hex, $content_type) = (shift, shift, shift, shift, shift, shift);
+
+    confess "Bucket name is required" unless $self->{bucket};
 
     _check_ascii_key($key);
 
@@ -300,6 +302,8 @@ sub download_to_file {
 sub _download {
     my ($self, $key, $appender) = @_;
 
+    confess "Bucket name is required" unless $self->{bucket};
+
     _check_ascii_key($key);
 
     my $offset = 0;
@@ -365,6 +369,8 @@ sub _download {
 sub size {
     my ($self, $key) = @_;
 
+    confess "Bucket name is required" unless $self->{bucket};
+
     _check_ascii_key($key);
 
     $self->{driver}->size($key);
@@ -379,6 +385,8 @@ sub size {
 
 sub delete {
     my ($self, $key) = @_;
+
+    confess "Bucket name is required" unless $self->{bucket};
 
     _check_ascii_key($key);
 
@@ -409,6 +417,58 @@ sub query_string_authentication_uri {
         $uri =~ s!^https?://[^/]+/!$replace!;
     }
     $uri;
+}
+
+=head2 get_buckets_ist
+
+Returns buckets list
+
+WARNING
+
+Метод падает c ошибкой
+Attribute (owner_id) does not pass the type constraint because: Validation failed for 'OwnerId'
+Уведомления направлены разрабтчикам:
+http://tracker.ceph.com/issues/16806 и https://github.com/rustyconover/net-amazon-s3/issues/18
+
+=cut
+
+sub get_buckets_list {
+    my ($self) = @_;
+
+    return $self->{driver}->get_buckets_list;
+}
+
+=head2 list_multipart_uploads
+
+Возвращает список multipart загрузок в бакете
+
+=cut
+
+sub list_multipart_uploads {
+    my ($self) = @_;
+
+    confess "Bucket name is required" unless $self->{bucket};
+
+    return $self->{driver}->list_multipart_uploads();
+}
+
+=head2 delete_multipart_upload
+
+Удаляет multipart загрузку в бакете
+
+Параметры позиционные: $key, $upload_id
+
+Ничего не возвращает
+
+=cut
+
+sub delete_multipart_upload {
+    my ( $self, $key, $upload_id ) = @_;
+
+    confess "Bucket name is required" unless $self->{bucket};
+    confess "key and upload ID is required" unless $key && $upload_id;
+
+    $self->{driver}->delete_multipart_upload($key, $upload_id);
 }
 
 1;
