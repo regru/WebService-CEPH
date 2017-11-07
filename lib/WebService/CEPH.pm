@@ -428,7 +428,7 @@ sub query_string_authentication_uri {
     $uri;
 }
 
-=head2 get_buckets_ist
+=head2 get_buckets_list
 
 Returns buckets list
 
