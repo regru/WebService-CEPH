@@ -30,7 +30,7 @@ However, it is the caller that is really responsible for security.
 
 package WebService::CEPH::FileShadow;
 
-# VERSION
+our $VERSION = '0.016'; # VERSION
 
 use strict;
 use warnings;
