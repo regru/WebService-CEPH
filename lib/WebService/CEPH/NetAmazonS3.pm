@@ -22,7 +22,7 @@ You can write your driver with the same interface, but with a different implemen
 
 package WebService::CEPH::NetAmazonS3;
 
-our $VERSION = '0.016'; # VERSION
+# VERSION
 
 use strict;
 use warnings;

@@ -42,7 +42,7 @@ This parameter is needed if you want to change the host for return to clients (y
 
 package WebService::CEPH;
 
-our $VERSION = '0.016'; # VERSION
+# VERSION
 
 use strict;
 use warnings;
