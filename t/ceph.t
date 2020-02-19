@@ -136,7 +136,7 @@ describe CEPH => sub {
         for my $partsdata ([qw/Aa B/], [qw/Aa Bb/], [qw/Aa Bb C/]) {
             it "multipart upload should work for @$partsdata" => sub {
                 my $data_s = join('', @$partsdata);
-                $driver->expects('initiate_multipart_upload')->with($key, md5_hex($data_s), undef)->returns($multipart_data);
+                $driver->expects('initiate_multipart_upload')->with($key, md5_hex($data_s), undef, undef)->returns($multipart_data);
                 my (@parts, @data);
                 $driver->expects('upload_part')->exactly(scalar @$partsdata)->returns(sub{
                     my ($self, $md, $part_no, $chunk) = @_;
@@ -152,19 +152,19 @@ describe CEPH => sub {
         }
 
         it "simple upload should work" => sub {
-            $driver->expects('upload_single_request')->with($key, 'Aa', undef);
+            $driver->expects('upload_single_request')->with($key, 'Aa', undef, undef);
             $ceph->upload($key, 'Aa');
             ok 1;
         };
 
         it "simple upload should work for less than multipart_threshold bytes" => sub {
-            $driver->expects('upload_single_request')->with($key, 'A', undef);
+            $driver->expects('upload_single_request')->with($key, 'A', undef, undef);
             $ceph->upload($key, 'A');
             ok 1;
         };
 
         it "simple upload should work for less than zero bytes" => sub {
-            $driver->expects('upload_single_request')->with($key, '', undef);
+            $driver->expects('upload_single_request')->with($key, '', undef, undef);
             $ceph->upload($key, '');
             ok 1;
         };
@@ -256,7 +256,7 @@ describe CEPH => sub {
                 my $data_s = join('', @$partsdata);
                 my $datafile = create_temp_file($data_s);
 
-                $driver->expects('initiate_multipart_upload')->with($key, md5_hex($data_s), undef)->returns($multipart_data);
+                $driver->expects('initiate_multipart_upload')->with($key, md5_hex($data_s), undef, undef)->returns($multipart_data);
                 my (@parts, @data);
                 $driver->expects('upload_part')->exactly(scalar @$partsdata)->returns(sub{
                     my ($self, $md, $part_no, $chunk) = @_;
@@ -276,7 +276,7 @@ describe CEPH => sub {
             my $datafile = create_temp_file($data_s);
             open my $f, "<", $datafile or die "$!";
 
-            $driver->expects('initiate_multipart_upload')->with($key, md5_hex('Hello'), undef)->returns($multipart_data);
+            $driver->expects('initiate_multipart_upload')->with($key, md5_hex('Hello'), undef, undef)->returns($multipart_data);
             my (@parts, @data);
             $driver->expects('upload_part')->exactly(3)->returns(sub{
                 my ($self, $md, $part_no, $chunk) = @_;
@@ -296,7 +296,7 @@ describe CEPH => sub {
 
             open my $f, "<", $datafile or die "$!";
 
-            $driver->expects('upload_single_request')->with($key, 'Ab', undef);
+            $driver->expects('upload_single_request')->with($key, 'Ab', undef, undef);
             $ceph->upload_from_file($key, $f);
         };
 
@@ -304,7 +304,7 @@ describe CEPH => sub {
             my $data_s = "Ab";
             my $datafile = create_temp_file($data_s);
 
-            $driver->expects('upload_single_request')->with($key, 'Ab', undef);
+            $driver->expects('upload_single_request')->with($key, 'Ab', undef, undef);
             $ceph->upload_from_file($key, $datafile);
         };
     };
