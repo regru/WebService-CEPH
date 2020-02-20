@@ -103,6 +103,16 @@ describe "FS Shadow" => sub {
             WebService::CEPH->expects('upload')->with('mykey', 'mydata', 'text/plain', undef)->once;
             $ceph->upload('mykey', 'mydata', 'text/plain');
         };
+        it "should work in s3 mode with acl" => sub {
+            $ceph->{mode} = 's3';
+            WebService::CEPH->expects('upload')->with('mykey', 'mydata', undef, 'public-read')->once;
+            $ceph->upload('mykey', 'mydata', undef, 'public-read');
+        };
+        it "should work in s3 mode with content-type and acl" => sub {
+            $ceph->{mode} = 's3';
+            WebService::CEPH->expects('upload')->with('mykey', 'mydata', 'text/plain', 'public-read')->once;
+            $ceph->upload('mykey', 'mydata', 'text/plain', 'public-read');
+        };
         it "should work in fs mode" => sub {
             $ceph->{mode} = 'fs';
             WebService::CEPH->expects('upload')->never;
@@ -138,6 +148,16 @@ describe "FS Shadow" => sub {
             $ceph->{mode} = 's3';
             WebService::CEPH->expects('upload_from_file')->with('mykey', $localfile, 'text/plain', undef)->once;
             $ceph->upload_from_file('mykey', $localfile, 'text/plain');
+        };
+        it "should work in s3 mode with acl" => sub {
+            $ceph->{mode} = 's3';
+            WebService::CEPH->expects('upload_from_file')->with('mykey', $localfile, undef, 'public-read')->once;
+            $ceph->upload_from_file('mykey', $localfile, undef, 'public-read');
+        };
+        it "should work in s3 mode with content-type and acl" => sub {
+            $ceph->{mode} = 's3';
+            WebService::CEPH->expects('upload_from_file')->with('mykey', $localfile, 'text/plain', 'public-read')->once;
+            $ceph->upload_from_file('mykey', $localfile, 'text/plain', 'public-read');
         };
         it "should work in fs mode" => sub {
             $ceph->{mode} = 'fs';
