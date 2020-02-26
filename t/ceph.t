@@ -290,6 +290,25 @@ describe CEPH => sub {
             cmp_deeply [@data], [qw/He ll o/];
         };
 
+        it "multipart upload should work for filehandle with content-type and acl" => sub {
+            my $data_s = "Hello";
+            my $datafile = create_temp_file($data_s);
+            open my $f, "<", $datafile or die "$!";
+
+            $driver->expects('initiate_multipart_upload')->with($key, md5_hex('Hello'), 'text/plain', 'public-read')->returns($multipart_data);
+            my (@parts, @data);
+            $driver->expects('upload_part')->exactly(3)->returns(sub{
+                my ($self, $md, $part_no, $chunk) = @_;
+                is $md+0, $multipart_data+0;
+                push @parts, $part_no;
+                push @data, $chunk;
+            });
+            $driver->expects('complete_multipart_upload')->with($multipart_data);
+            $ceph->upload_from_file($key, $f, 'text/plain', 'public-read');
+            cmp_deeply [@parts], [qw/1 2 3/];
+            cmp_deeply [@data], [qw/He ll o/];
+        };
+
         it "non-multipart upload should work for filehandle" => sub {
             my $data_s = "Ab";
             my $datafile = create_temp_file($data_s);

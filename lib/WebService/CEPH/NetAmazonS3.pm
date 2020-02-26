@@ -123,7 +123,7 @@ Upload an object for one request (non-multipart upload), put a custom or private
 =cut
 
 sub upload_single_request {
-    my ($self, $key) = (shift, shift); # after shifts: $_[0] - value, $_[1] - content-type, $_[1] - acl
+    my ($self, $key) = (shift, shift); # after shifts: $_[0] - value, $_[1] - content-type, $_[2] - acl
 
     my $md5 = md5_hex($_[0]);
     my $object = $self->_request_object->object(
