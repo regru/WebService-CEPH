@@ -77,7 +77,7 @@ sub upload {
     my ($self, $key) = (shift, shift);
 
     if ($self->{mode} =~ /s3/) {
-        $self->SUPER::upload($key, $_[0], $_[1]);
+        $self->SUPER::upload($key, $_[0], $_[1], $_[2]);
     }
     if ($self->{mode} =~ /fs/) {
         my $path = $self->_filepath($key, 1);
@@ -89,10 +89,10 @@ sub upload {
 }
 
 sub upload_from_file {
-    my ($self, $key, $fh_or_filename, $content_type) = @_;
+    my ($self, $key, $fh_or_filename, $content_type, $acl ) = @_;
 
     if ($self->{mode} =~ /s3/) {
-        $self->SUPER::upload_from_file($key, $fh_or_filename, $content_type);
+        $self->SUPER::upload_from_file($key, $fh_or_filename, $content_type, $acl );
     }
     if ($self->{mode} =~ /fs/) {
         my $path = $self->_filepath($key, 1);
